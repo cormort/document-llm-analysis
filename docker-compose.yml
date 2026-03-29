@@ -1,0 +1,154 @@
+# Docker Compose for Document LLM Analysis
+# Full stack deployment with backend, frontend, redis, and chromadb
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # Backend Service (FastAPI)
+  # ===========================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: doc-llm-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LLM_FAST_PROVIDER=${LLM_FAST_PROVIDER:-Gemini}
+      - LLM_FAST_MODEL=${LLM_FAST_MODEL:-gemini-1.5-flash}
+      - LLM_FAST_URL=${LLM_FAST_URL:-http://localhost:11434/v1}
+      - LLM_SMART_PROVIDER=${LLM_SMART_PROVIDER:-Gemini}
+      - LLM_SMART_MODEL=${LLM_SMART_MODEL:-gemini-1.5-pro}
+      - LLM_SMART_URL=${LLM_SMART_URL:-http://localhost:1234/v1}
+      - REDIS_URL=redis://redis:6379/0
+      - RATE_LIMIT_DEFAULT=30/minute
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - doc-llm-network
+
+  # ===========================================
+  # Frontend Service (Next.js)
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://backend:8000
+    container_name: doc-llm-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - doc-llm-network
+
+  # ===========================================
+  # Redis Service (for caching)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: doc-llm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - doc-llm-network
+
+  # ===========================================
+  # ChromaDB Service (Vector Database)
+  # ===========================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: doc-llm-chromadb
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - ALLOW_RESET=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - doc-llm-network
+
+  # ===========================================
+  # Nginx Reverse Proxy (Optional)
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    container_name: doc-llm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    profiles:
+      - production
+    networks:
+      - doc-llm-network
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  doc-llm-network:
+    driver: bridge
+    name: doc-llm-network
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  redis_data:
+    driver: local
+    name: doc-llm-redis-data
+  chroma_data:
+    driver: local
+    name: doc-llm-chroma-data

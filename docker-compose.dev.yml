@@ -1,0 +1,83 @@
+# Docker Compose for Development
+# Lightweight setup for local development
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # Backend Service (with hot reload)
+  # ===========================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: doc-llm-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+      - DATABASE_URL=sqlite:///./data/users.db
+      - LLM_FAST_PROVIDER=${LLM_FAST_PROVIDER:-Gemini}
+      - LLM_FAST_MODEL=${LLM_FAST_MODEL:-gemini-1.5-flash}
+      - LLM_SMART_PROVIDER=${LLM_SMART_PROVIDER:-Gemini}
+      - LLM_SMART_MODEL=${LLM_SMART_MODEL:-gemini-1.5-pro}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - doc-llm-dev-network
+
+  # ===========================================
+  # Frontend Service (development mode)
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: doc-llm-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - doc-llm-dev-network
+
+  # ===========================================
+  # Redis (optional, for caching)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: doc-llm-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - doc-llm-dev-network
+
+networks:
+  doc-llm-dev-network:
+    driver: bridge
+    name: doc-llm-dev-network
+
+volumes:
+  redis_dev_data:
+    driver: local

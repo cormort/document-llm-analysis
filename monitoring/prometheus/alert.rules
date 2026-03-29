@@ -1,0 +1,29 @@
+groups:
+  - name: API_Alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API Error Rate (instance {{ $labels.instance }})"
+          description: "API is returning 5xx status codes for more than 5% of requests."
+
+      - alert: BackendDown
+        expr: up{job="doc-llm-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend API is down"
+          description: "Prometheus cannot scrape metrics from backend:8000."
+
+      - alert: ChromaDBSlow
+        expr: rate(chromadb_query_latency_seconds_sum[1m]) / rate(chromadb_query_latency_seconds_count[1m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ChromaDB queries are slow"
+          description: "Average ChromaDB query latency is above 3 seconds."

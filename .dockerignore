@@ -1,0 +1,64 @@
+# Docker ignore file for Backend
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.eggs
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# Node modules (frontend)
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Data and logs (mount at runtime)
+data/
+logs/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Tests
+tests/
+**/test_*.py
+**/*_test.py
+.pytest_cache
+.coverage
+htmlcov
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "chroma-mcp": {
+      "description": "ChromaDB 官方 MCP Server，管理向量資料庫",
+      "command": "uvx",
+      "args": [
+        "chroma-mcp",
+        "--client-type", "persistent",
+        "--data-dir", "./data/chroma_db"
+      ],
+      "enabled": true
+    },
+    "markitdown": {
+      "description": "微軟官方，將任意檔案轉換為 Markdown",
+      "command": "/Users/hsiehminchieh/Dev/Work/document-llm-analysis/.venv/bin/markitdown-mcp",
+      "args": [],
+      "enabled": true
+    },
+    "local-faiss": {
+      "description": "本地 FAISS 向量搜索，支援 Re-ranking",
+      "command": "local-faiss-mcp",
+      "args": [
+        "--index-dir", "./.vector_store",
+        "--embed", "all-MiniLM-L6-v2",
+        "--rerank"
+      ],
+      "enabled": false
+    },
+    "open-websearch": {
+      "description": "免費多引擎網路搜索，不需 API Key",
+      "command": "npx",
+      "args": ["open-websearch@latest"],
+      "env": {
+        "MODE": "stdio",
+        "DEFAULT_SEARCH_ENGINE": "duckduckgo",
+        "ALLOWED_SEARCH_ENGINES": "duckduckgo,bing,brave"
+      },
+      "enabled": true
+    },
+    "zaturn": {
+      "description": "數據分析 Co-pilot，SQL/CSV/Parquet",
+      "command": "zaturn",
+      "args": ["mcp"],
+      "enabled": false
+    }
+  },
+  "settings": {
+    "connectionTimeout": 30000,
+    "maxRetries": 3,
+    "logLevel": "info"
+  }
+}
