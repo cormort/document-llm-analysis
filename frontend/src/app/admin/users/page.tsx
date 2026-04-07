@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface User {
   id: number;

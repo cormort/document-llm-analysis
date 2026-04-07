@@ -42,6 +42,13 @@ def get_model(config: RunnableConfig):
             base_url=local_url,
             temperature=0,
         )
+    elif provider == "omlx":
+        llm = ChatOpenAI(
+            model=model_name,
+            api_key=SecretStr("omlx"),  # omlx local server, key is a placeholder
+            base_url=local_url,
+            temperature=0,
+        )
     else:
         # Fallback
         llm = ChatGoogleGenerativeAI(

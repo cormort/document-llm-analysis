@@ -24,6 +24,7 @@ services:
       - LLM_SMART_PROVIDER=${LLM_SMART_PROVIDER:-Gemini}
       - LLM_SMART_MODEL=${LLM_SMART_MODEL:-gemini-1.5-pro}
       - LLM_SMART_URL=${LLM_SMART_URL:-http://localhost:1234/v1}
+      - LLM_OMLX_URL=${LLM_OMLX_URL:-http://host.docker.internal:8000/v1}
       - REDIS_URL=redis://redis:6379/0
       - RATE_LIMIT_DEFAULT=30/minute
     volumes:

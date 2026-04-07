@@ -24,6 +24,7 @@ services:
       - LLM_FAST_MODEL=${LLM_FAST_MODEL:-gemini-1.5-flash}
       - LLM_SMART_PROVIDER=${LLM_SMART_PROVIDER:-Gemini}
       - LLM_SMART_MODEL=${LLM_SMART_MODEL:-gemini-1.5-pro}
+      - LLM_OMLX_URL=${LLM_OMLX_URL:-http://host.docker.internal:8000/v1}
       - PYTHONUNBUFFERED=1
     volumes:
       - ./backend/app:/app/app:ro

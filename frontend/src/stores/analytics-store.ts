@@ -23,7 +23,7 @@ interface AnalyticsState {
   flushEvents: () => Promise<void>;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 function generateSessionId(): string {
   return `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;

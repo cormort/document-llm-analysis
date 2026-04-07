@@ -6,6 +6,7 @@
 
 import os
 import secrets
+from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -33,6 +34,10 @@ class Settings(BaseSettings):
     LLM_SMART_PROVIDER: str = "Gemini"
     LLM_SMART_MODEL: str = "gemini-1.5-pro"
     LLM_SMART_URL: str = "http://localhost:1234/v1"
+
+    # omlx
+    LLM_OMLX_URL: str = "http://127.0.0.1:8000/v1"
+    OMLX_API_KEY: str = ""
 
     # Upload
     MAX_UPLOAD_SIZE_MB: int = 50
@@ -71,7 +76,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
-        env_file=".env",
+        env_file=str(Path(__file__).resolve().parents[3] / ".env"),
         extra="ignore",
     )
 

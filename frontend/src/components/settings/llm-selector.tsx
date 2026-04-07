@@ -17,10 +17,11 @@ import {
 } from "lucide-react";
 
 const PROVIDERS = [
-    "Local (LM Studio)",
-    "Ollama",
-    "Gemini",
-    "OpenAI",
+  "Local (LM Studio)",
+  "Ollama",
+  "Gemini",
+  "OpenAI",
+  "omlx",
 ];
 
 interface LLMSelectorProps {
@@ -47,13 +48,17 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
         silent = false
     ) => {
         if (!provider) return;
+        
+        // Prevent sending cloud API keys (like Gemini) to local providers
+        const effectiveKey = (provider.includes("Local") || provider === "Ollama" || provider === "omlx") ? "" : key;
+
         if (!silent) {
             if (tier === "main") setLoadingMain(true);
             else setLoadingFast(true);
         }
 
         try {
-            const models = await listModels(provider, url, key || undefined);
+            const models = await listModels(provider, url, effectiveKey || undefined);
             if (models && models.length > 0) {
                 if (tier === "main") setMainModels(models);
                 else setFastModels(models);
@@ -82,9 +87,9 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
     // Auto-detect Main
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (store.provider?.includes("Local") || store.provider === "Ollama") {
-                 fetchModelsForTier("main", store.provider, store.local_url || "", store.api_key || "", true);
-            }
+if (store.provider?.includes("Local") || store.provider === "Ollama" || store.provider === "omlx") {
+    fetchModelsForTier("main", store.provider, store.local_url || "", store.api_key || "", true);
+  }
         }, 800);
         return () => clearTimeout(timer);
     }, [store.provider, store.local_url, store.api_key, fetchModelsForTier]);
@@ -92,9 +97,9 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
     // Auto-detect Fast
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama") {
-                 fetchModelsForTier("fast", store.fastProvider, store.fastUrl || "", store.api_key || "", true);
-            }
+if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || store.fastProvider === "omlx") {
+    fetchModelsForTier("fast", store.fastProvider, store.fastUrl || "", store.api_key || "", true);
+  }
         }, 800);
         return () => clearTimeout(timer);
     }, [store.fastProvider, store.fastUrl, store.api_key, fetchModelsForTier]);
@@ -129,6 +134,10 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
                             setProvider(newProvider);
                             if (newProvider === "Gemini") setModel(isMain ? "gemini-1.5-pro" : "gemini-1.5-flash");
                             else if (newProvider === "OpenAI") setModel("gpt-4o");
+                            else if (newProvider === "omlx") {
+                                setUrl("http://127.0.0.1:8000/v1");
+                                setModel("");
+                            }
                             else setModel(""); 
                         }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
@@ -174,13 +183,28 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
                     )}
                 </div>
 
-                {(provider?.includes("Local") || provider?.includes("Ollama")) && (
+                {(provider?.includes("Local") || provider?.includes("Ollama") || provider === "omlx") && (
                     <div className="space-y-1">
                         <label className="text-xs text-slate-500 font-medium">API URL</label>
                         <Input
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
                             className="h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 rounded-lg"
+                        />
+                    </div>
+                )}
+
+                {(provider === "Gemini" || provider === "OpenAI") && (
+                    <div className="space-y-1 pt-2 border-t border-slate-700/50">
+                        <label className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                            <Key size={12} /> {provider === "OpenAI" ? "API Key" : "Google API Key"}
+                        </label>
+                        <Input
+                            type="password"
+                            value={store.api_key || ""}
+                            onChange={(e) => store.setApiKey(e.target.value)}
+                            className="h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 rounded-lg"
+                            placeholder="sk-..."
                         />
                     </div>
                 )}
@@ -233,19 +257,6 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
                             {renderConfig("fast")}
                         </TabsContent>
                     </Tabs>
-
-                    <div className="space-y-1 mt-4 pt-3 border-t border-slate-700/50">
-                        <label className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                            <Key size={12} /> Google API Key
-                        </label>
-                        <Input
-                            type="password"
-                            value={store.api_key || ""}
-                            onChange={(e) => store.setApiKey(e.target.value)}
-                            className="h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 rounded-lg"
-                            placeholder="sk-..."
-                        />
-                    </div>
                 </div>
             )}
 

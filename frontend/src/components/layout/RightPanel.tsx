@@ -21,7 +21,7 @@ export function RightPanel() {
   useEffect(() => {
     async function fetchDocuments() {
       try {
-        const response = await fetch("http://localhost:8000/api/rag/documents");
+        const response = await fetch("/api/rag/documents");
         if (response.ok) {
           const data = await response.json();
           // Assuming the API returns a list of strings or objects. ADJUST based on actual API response.

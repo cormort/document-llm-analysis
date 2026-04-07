@@ -90,34 +90,42 @@ class LLMService:
     # ==========================================
     # Provider Logic & Routing
     # ==========================================
+    def _get_api_key_for_provider(self, provider: str) -> str | None:
+        """Return the appropriate API key for a given provider."""
+        if provider == "Gemini":
+            return self.api_key
+        if provider == "omlx":
+            return settings.OMLX_API_KEY or None
+        return None
+
     def get_routing_config(self, task_type: str = "fast") -> dict[str, Any]:
         """Get optimal LLM configuration based on task type from global settings."""
         if task_type == "fast":
+            provider = settings.LLM_FAST_PROVIDER
+            local_url = settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_FAST_URL
             return {
-                "provider": settings.LLM_FAST_PROVIDER,
+                "provider": provider,
                 "model_name": settings.LLM_FAST_MODEL,
-                "local_url": settings.LLM_FAST_URL,
-                "api_key_input": self.api_key
-                if settings.LLM_FAST_PROVIDER == "Gemini"
-                else None,
+                "local_url": local_url,
+                "api_key_input": self._get_api_key_for_provider(provider),
             }
         elif task_type == "smart":
+            provider = settings.LLM_SMART_PROVIDER
+            local_url = settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_SMART_URL
             return {
-                "provider": settings.LLM_SMART_PROVIDER,
+                "provider": provider,
                 "model_name": settings.LLM_SMART_MODEL,
-                "local_url": settings.LLM_SMART_URL,
-                "api_key_input": self.api_key
-                if settings.LLM_SMART_PROVIDER == "Gemini"
-                else None,
+                "local_url": local_url,
+                "api_key_input": self._get_api_key_for_provider(provider),
             }
 
+        provider = settings.LLM_SMART_PROVIDER
+        local_url = settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_SMART_URL
         return {
-            "provider": settings.LLM_SMART_PROVIDER,
+            "provider": provider,
             "model_name": settings.LLM_SMART_MODEL,
-            "local_url": settings.LLM_SMART_URL,
-            "api_key_input": self.api_key
-            if settings.LLM_SMART_PROVIDER == "Gemini"
-            else None,
+            "local_url": local_url,
+            "api_key_input": self._get_api_key_for_provider(provider),
         }
 
     # ==========================================

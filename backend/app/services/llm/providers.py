@@ -131,10 +131,10 @@ class LLMProviders:
             )
 
         if any(
-            p in provider for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo"]
+            p in provider for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo", "omlx"]
         ):
             return self._call_local(
-                provider, model_name, local_url, system_prompt, user_prompt, **kwargs
+                provider, model_name, local_url, api_key_input, system_prompt, user_prompt, **kwargs
             )
 
         return f"Unknown Provider: {provider}"
@@ -184,6 +184,7 @@ class LLMProviders:
         provider: str,
         model_name: str,
         local_url: str | None,
+        api_key_input: str | None,
         system_prompt: str,
         user_prompt: str,
         **kwargs,
@@ -193,6 +194,9 @@ class LLMProviders:
         endpoint = f"{base_url}/chat/completions"
 
         headers = {"Content-Type": "application/json", "Connection": "close"}
+        # omlx requires API key authentication
+        if provider == "omlx" and api_key_input:
+            headers["Authorization"] = f"Bearer {api_key_input}"
         payload = {
             "model": model_name,
             "messages": [
@@ -271,7 +275,7 @@ class LLMProviders:
 
         if any(
             p in provider
-            for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo", "OpenAI"]
+            for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo", "OpenAI", "omlx"]
         ):
             return self._list_openai_compatible_models(
                 provider, local_url, api_key_input
@@ -311,6 +315,9 @@ class LLMProviders:
         else:
             base_url = local_url.rstrip("/")
             headers = {}
+            # omlx requires API key authentication
+            if provider == "omlx" and api_key_input:
+                headers["Authorization"] = f"Bearer {api_key_input}"
 
         endpoint = f"{base_url}/models"
         try:

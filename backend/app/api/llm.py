@@ -316,8 +316,14 @@ async def list_models_get(
 ) -> list[str]:
     """List available models from the specified provider (GET)."""
     try:
+        # Fallback to server-configured keys if not provided
+        effective_key = api_key
+        if provider == "omlx" and not effective_key:
+            from app.core.config import settings as cfg
+            effective_key = cfg.OMLX_API_KEY or None
+
         models = await llm_service.list_models(
-            provider=provider, local_url=local_url, api_key_input=api_key
+            provider=provider, local_url=local_url, api_key_input=effective_key
         )
         return models
     except Exception as e:
