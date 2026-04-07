@@ -96,10 +96,12 @@ class LLMProviders:
             if not response.candidates:
                 return "Gemini Error: No candidates returned."
 
-            if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                tokens = getattr(response.usage_metadata, 'total_token_count', 0)
+            if hasattr(response, "usage_metadata") and response.usage_metadata:
+                tokens = getattr(response.usage_metadata, "total_token_count", 0)
                 if tokens > 0:
-                    LLM_TOKEN_USAGE_TOTAL.labels(provider="Gemini", model=clean_model_name).inc(tokens)
+                    LLM_TOKEN_USAGE_TOTAL.labels(
+                        provider="Gemini", model=clean_model_name
+                    ).inc(tokens)
 
             candidate = response.candidates[0]
             if candidate.content and candidate.content.parts:
@@ -131,10 +133,17 @@ class LLMProviders:
             )
 
         if any(
-            p in provider for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo", "omlx"]
+            p in provider
+            for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo", "omlx"]
         ):
             return self._call_local(
-                provider, model_name, local_url, api_key_input, system_prompt, user_prompt, **kwargs
+                provider,
+                model_name,
+                local_url,
+                api_key_input,
+                system_prompt,
+                user_prompt,
+                **kwargs,
             )
 
         return f"Unknown Provider: {provider}"
@@ -174,7 +183,9 @@ class LLMProviders:
             usage = data.get("usage", {})
             tokens = usage.get("total_tokens", 0)
             if tokens > 0:
-                LLM_TOKEN_USAGE_TOTAL.labels(provider="OpenAI", model=model_name).inc(tokens)
+                LLM_TOKEN_USAGE_TOTAL.labels(provider="OpenAI", model=model_name).inc(
+                    tokens
+                )
             return data["choices"][0]["message"]["content"]
         except Exception as e:
             return f"OpenAI Error: {e}"
@@ -190,13 +201,23 @@ class LLMProviders:
         **kwargs,
     ) -> str:
         """Local LLM API call (OpenAI-compatible)."""
+        # Normalize provider name to handle case/whitespace variations
+        normalized_provider = provider.strip().lower()
         base_url = (local_url or "").rstrip("/")
         endpoint = f"{base_url}/chat/completions"
 
         headers = {"Content-Type": "application/json", "Connection": "close"}
+
+        effective_key = api_key_input
+        # omlx: always prefer env-configured key (frontend may send stale cloud keys)
+        if normalized_provider == "omlx":
+            from app.core.config import settings as cfg
+
+            effective_key = cfg.OMLX_API_KEY or api_key_input or None
+
         # omlx requires API key authentication
-        if provider == "omlx" and api_key_input:
-            headers["Authorization"] = f"Bearer {api_key_input}"
+        if normalized_provider == "omlx" and effective_key:
+            headers["Authorization"] = f"Bearer {effective_key}"
         payload = {
             "model": model_name,
             "messages": [
@@ -229,7 +250,80 @@ class LLMProviders:
                 usage = data.get("usage", {})
                 tokens = usage.get("total_tokens", 0)
                 if tokens > 0:
-                    LLM_TOKEN_USAGE_TOTAL.labels(provider=provider, model=model_name).inc(tokens)
+                    LLM_TOKEN_USAGE_TOTAL.labels(
+                        provider=provider, model=model_name
+                    ).inc(tokens)
+                return data["choices"][0]["message"]["content"]
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError,
+            ) as e:
+                last_error = e
+                logger.warn(
+                    "Local LLM Connection Abandoned, Retrying...",
+                    attempt=attempt + 1,
+                    error=str(e),
+                )
+                time.sleep(1)
+            except requests.exceptions.HTTPError as e:
+                return f"{provider} HTTP Error: {e} - Details: {response.text}"
+            except Exception as e:
+                return f"{provider} Unexpected Error: {e}"
+
+        return (
+            f"{provider} Error: Connection failed after {max_retries} attempts. "
+            f"Last error: {last_error}"
+        )
+        """Local LLM API call (OpenAI-compatible)."""
+        base_url = (local_url or "").rstrip("/")
+        endpoint = f"{base_url}/chat/completions"
+
+        headers = {"Content-Type": "application/json", "Connection": "close"}
+
+        effective_key = api_key_input
+        if provider == "omlx":
+            from app.core.config import settings as cfg
+
+            effective_key = cfg.OMLX_API_KEY or api_key_input or None
+
+        # omlx requires API key authentication
+        if provider == "omlx" and effective_key:
+            headers["Authorization"] = f"Bearer {effective_key}"
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": kwargs.get("temperature", 0.7),
+        }
+
+        max_retries = 3
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(
+                    "Local LLM Request",
+                    attempt=attempt + 1,
+                    provider=provider,
+                    model=model_name,
+                    endpoint=endpoint,
+                )
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    timeout=kwargs.get("timeout", 900),
+                )
+                response.raise_for_status()
+                data = response.json()
+                usage = data.get("usage", {})
+                tokens = usage.get("total_tokens", 0)
+                if tokens > 0:
+                    LLM_TOKEN_USAGE_TOTAL.labels(
+                        provider=provider, model=model_name
+                    ).inc(tokens)
                 return data["choices"][0]["message"]["content"]
             except (
                 requests.exceptions.ConnectionError,
@@ -275,7 +369,15 @@ class LLMProviders:
 
         if any(
             p in provider
-            for p in ["Local", "LM Studio", "Osaurus", "Ollama", "Exo", "OpenAI", "omlx"]
+            for p in [
+                "Local",
+                "LM Studio",
+                "Osaurus",
+                "Ollama",
+                "Exo",
+                "OpenAI",
+                "omlx",
+            ]
         ):
             return self._list_openai_compatible_models(
                 provider, local_url, api_key_input
@@ -315,9 +417,16 @@ class LLMProviders:
         else:
             base_url = local_url.rstrip("/")
             headers = {}
+
+            effective_key = api_key_input
+            if provider == "omlx":
+                from app.core.config import settings as cfg
+
+                effective_key = cfg.OMLX_API_KEY or api_key_input or None
+
             # omlx requires API key authentication
-            if provider == "omlx" and api_key_input:
-                headers["Authorization"] = f"Bearer {api_key_input}"
+            if provider == "omlx" and effective_key:
+                headers["Authorization"] = f"Bearer {effective_key}"
 
         endpoint = f"{base_url}/models"
         try:

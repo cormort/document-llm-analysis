@@ -318,9 +318,10 @@ async def list_models_get(
     try:
         # Fallback to server-configured keys if not provided
         effective_key = api_key
-        if provider == "omlx" and not effective_key:
+        # omlx: always prefer env-configured key (frontend may send stale cloud keys)
+        if provider == "omlx":
             from app.core.config import settings as cfg
-            effective_key = cfg.OMLX_API_KEY or None
+            effective_key = cfg.OMLX_API_KEY or api_key or None
 
         models = await llm_service.list_models(
             provider=provider, local_url=local_url, api_key_input=effective_key

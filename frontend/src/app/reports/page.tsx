@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
-import { FileUploader } from "@/components/file-uploader";
 import {
     listSkills,
     listTemplates,
@@ -18,27 +14,12 @@ import {
 } from "@/lib/api";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useDocumentStore } from "@/stores/document-store";
-import { 
-    FileText, 
-    Rocket, 
-    CheckCircle2, 
-    XCircle, 
-    Copy, 
-    Download, 
-    ChevronLeft, 
-    ChevronRight,
-    Loader2,
-    Briefcase,
-    Clock
-} from "lucide-react";
 
 export default function ReportsPage() {
     console.log("ReportsPage Rendering");
     const { provider, model_name, local_url, api_key, context_window } = useSettingsStore();
     
-    // Global document store
     const { documents, fetchDocuments } = useDocumentStore();
-    
     const [skills, setSkills] = useState<SkillInfo[]>([]);
     const [templates, setTemplates] = useState<TemplateInfo[]>([]);
     const [loading, setLoading] = useState(true);
@@ -49,7 +30,8 @@ export default function ReportsPage() {
     const [selectedTemplate, setSelectedTemplate] = useState<string>("");
     const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
     const [report, setReport] = useState<ReportResponse | null>(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    // Added for option B (Reading Overlay)
+    const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
     useEffect(() => {
         fetchDocuments();
@@ -61,7 +43,6 @@ export default function ReportsPage() {
                 ]);
                 setSkills(skillList);
                 setTemplates(templateList);
-                // 預設選擇第一個模板
                 if (templateList.length > 0) {
                     setSelectedTemplate(templateList[0].id);
                     setSelectedSkills(templateList[0].recommended_skills);
@@ -75,7 +56,6 @@ export default function ReportsPage() {
         initData();
     }, [fetchDocuments]);
 
-    // 選擇模板時自動推薦技能
     const handleTemplateSelect = (templateId: string) => {
         setSelectedTemplate(templateId);
         const template = templates.find((t) => t.id === templateId);
@@ -84,8 +64,19 @@ export default function ReportsPage() {
         }
     };
 
+    const handleSkillToggle = (skillId: string) => {
+        if (selectedSkills.includes(skillId)) {
+            setSelectedSkills(selectedSkills.filter(id => id !== skillId));
+        } else {
+            setSelectedSkills([...selectedSkills, skillId]);
+        }
+    };
+
     const handleGenerate = async () => {
-        if (!selectedDoc) return;
+        if (!selectedDoc) {
+             setError("Please select a document first.");
+             return;
+        }
         setGenerating(true);
         setError(null);
         try {
@@ -102,294 +93,275 @@ export default function ReportsPage() {
                 }
             });
             setReport(res);
+            setIsOverlayOpen(true); // Auto-open overlay
         } catch (err) {
             console.error("Generation failed", err);
-            setError(err instanceof Error ? err.message : "報表生成失敗，請稍後再試");
+            setError(err instanceof Error ? err.message : "Report generation failed");
         } finally {
             setGenerating(false);
         }
     };
-    
-    // 複製內容
+
     const handleCopyReport = () => {
         if (!report) return;
         navigator.clipboard.writeText(report.content);
-        alert("分析報告已複製到剪貼簿");
+        alert("Report copied to clipboard.");
     };
 
-    // 下載 Word
     const handleDownloadWord = async () => {
         if (!report) return;
         try {
-            const title = templates.find(t => t.id === selectedTemplate)?.name || "分析報告";
+            const title = templates.find(t => t.id === selectedTemplate)?.name || "Analysis Report";
             await downloadReportDocx(report.content, title);
         } catch (err) {
             console.error("Download failed", err);
-            setError("下載失敗，請檢查網路連線或稍後再試");
+            setError("Download failed");
         }
     };
 
-    const categories = Array.from(new Set(skills.map(s => s.category)));
+    // Calculate dynamic UI elements
+    const selectedTemplateObj = templates.find(t => t.id === selectedTemplate);
 
     if (loading) {
         return (
-            <div className="flex-1 flex flex-col bg-slate-50/50 p-6 space-y-6 h-screen overflow-hidden">
-                <Skeleton className="h-20 w-full" />
-                <div className="grid grid-cols-12 gap-6 flex-1">
-                    <Skeleton className="col-span-3 h-full rounded-2xl" />
-                    <Skeleton className="col-span-9 h-full rounded-2xl" />
-                </div>
+            <div className="flex-1 flex items-center justify-center bg-surface h-full">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen bg-slate-50/50 overflow-hidden font-sans">
-            {/* 1. Sidebar (Document Selection) - Left Panel */}
-            <div 
-                className={`flex-shrink-0 bg-white/70 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300 flex flex-col z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] ${isSidebarOpen ? "w-[280px]" : "w-0 overflow-hidden"}`}
-            >
-                <div className="p-6 border-b border-slate-100/50">
-                    <h2 className="font-black text-xl flex items-center gap-3 text-slate-800 tracking-tight">
-                        <div className="p-2 bg-indigo-600 rounded-lg shadow-indigo-200 shadow-lg">
-                             <Briefcase className="text-white w-5 h-5" /> 
+        <div className="flex-1 min-h-screen bg-surface font-['Inter'] relative text-on-surface w-full overflow-hidden flex flex-col">
+            {/* Configuration Header (Sticky) */}
+             <section className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md px-10 py-6 border-b border-outline-variant/30">
+                <div className="max-w-6xl mx-auto">
+                    {/* Templates Row */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-[12px] font-semibold text-on-surface-variant uppercase tracking-[0.1em]">Select Intelligence Template</h3>
                         </div>
-                        報告中心
-                    </h2>
-                    <p className="text-xs font-bold text-slate-400 mt-2 tracking-widest uppercase pl-1">Report Center</p>
-                </div>
-
-                <div className="p-6 pb-2 border-b border-slate-100/50">
-                     <FileUploader onUploadComplete={fetchDocuments} />
-                     <p className="text-[10px] text-slate-400 mt-3 text-center font-medium">支援 PDF, TXT, DOCX</p>
-                </div>
-
-                <ScrollArea className="flex-1">
-                    <div className="p-4 space-y-2">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">Source Files</h3>
-                        {documents.length === 0 ? (
-                            <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-xl m-2">
-                                <p className="text-sm text-slate-400 font-medium">尚無文件</p>
-                            </div>
-                        ) : (
-                            documents.map((doc) => (
-                                <button
-                                    key={doc.collection_name}
-                                    onClick={() => setSelectedDoc(doc.collection_name)}
-                                    className={`w-full text-left p-3 rounded-xl text-sm transition-all duration-300 group ${
-                                        selectedDoc === doc.collection_name
-                                            ? "bg-indigo-50/80 border border-indigo-200 text-indigo-700 shadow-sm ring-1 ring-indigo-100"
-                                            : "hover:bg-white hover:shadow-md border border-transparent text-slate-600 hover:text-slate-900"
+                        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                            {templates.map(t => (
+                                <div 
+                                    key={t.id} 
+                                    onClick={() => handleTemplateSelect(t.id)}
+                                    className={`flex-shrink-0 w-72 p-6 rounded-xl editorial-shadow group cursor-pointer transition-all ${
+                                        selectedTemplate === t.id 
+                                        ? "bg-surface-container-lowest border-2 border-primary-container relative" 
+                                        : "bg-surface-container-lowest hover:bg-primary-container border-2 border-transparent"
                                     }`}
                                 >
-                                    <div className="font-bold truncate flex items-center gap-2">
-                                        {selectedDoc === doc.collection_name ? <CheckCircle2 size={14} className="text-indigo-500"/> : <FileText size={14} className="text-slate-300 group-hover:text-slate-500"/>}
-                                        {doc.file_name}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 pl-6 font-mono opacity-70">
-                                        <Clock size={10} /> <span>{doc.indexed_at.slice(0, 10)}</span>
-                                    </div>
-                                </button>
-                            ))
-                        )}
-                    </div>
-                </ScrollArea>
-                
-                {/* Generate Button in Sidebar for better Mobile Flow or consistency? No, keep main action prominent. */}
-            </div>
-
-            {/* Sidebar Toggle (Floating) */}
-            <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className={`absolute bottom-6 z-30 w-8 h-12 bg-white border border-slate-200 shadow-xl rounded-r-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all duration-300 hover:w-10 ${isSidebarOpen ? "left-[280px]" : "left-0"}`}
-            >
-                {isSidebarOpen ? <ChevronLeft size={16}/> : <ChevronRight size={16}/>}
-            </button>
-
-            {/* 2. Main Content Area */}
-            <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-slate-50/30">
-                <Header title="產生分析報告" subtitle="Report Generation Level 3" />
-                
-                <div className="flex-1 overflow-y-auto scroll-smooth">
-                    {/* Unified Sticky Header for Configuration */}
-                    <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/50 shadow-sm transition-all duration-300">
-                        <div className="max-w-[1200px] mx-auto px-8 py-6">
-                            <div className="flex gap-8 items-start">
-                                {/* Configuration Columns */}
-                                <div className="flex-1 flex flex-col gap-6 min-w-0">
+                                    {selectedTemplate === t.id && (
+                                        <div className="absolute top-4 right-4 relative flex items-center justify-center border-none" style={{pointerEvents: 'none'}}>
+                                            <span className="material-symbols-outlined text-primary-container" style={{fontVariationSettings: '"FILL" 1'}}>check_circle</span>
+                                        </div>
+                                    )}
                                     
-                                    {/* Template Selection */}
-                                    <div className="min-w-0">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                <div className="w-4 h-4 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 text-[10px]">1</div> 
-                                                選擇報告模板
-                                            </label>
-                                        </div>
-                                        <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2 no-scrollbar">
-                                            {templates.map((t) => (
-                                                <button
-                                                    key={t.id}
-                                                    onClick={() => handleTemplateSelect(t.id)}
-                                                    className={`flex-shrink-0 text-left px-4 py-3 rounded-xl border transition-all w-[200px] group ${
-                                                        selectedTemplate === t.id
-                                                            ? "bg-indigo-600 border-indigo-600 text-white shadow-indigo-200 shadow-md ring-2 ring-indigo-100"
-                                                            : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/30"
-                                                    }`}
-                                                >
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <span className="font-bold text-sm tracking-tight">{t.name}</span>
-                                                        {selectedTemplate === t.id && <CheckCircle2 size={14} className="text-indigo-300" />}
-                                                    </div>
-                                                    <p className={`text-[11px] leading-relaxed line-clamp-2 ${selectedTemplate === t.id ? "text-indigo-100" : "text-slate-400 group-hover:text-slate-500"}`}>
-                                                        {t.description}
-                                                    </p>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Skills Selection */}
-                                    <div className="min-w-0">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <div className="w-4 h-4 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 text-[10px]">2</div>
-                                            配置專家技能
-                                        </label>
-                                        <div className="bg-white/50 backdrop-blur-sm rounded-xl border border-slate-200/60 p-1 flex gap-2 overflow-x-auto no-scrollbar items-center">
-                                            {categories.map(cat => (
-                                                <div key={cat} className="flex-shrink-0 flex items-center gap-2 px-3 border-r last:border-r-0 border-slate-200/60 py-1">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">{cat}</span>
-                                                    <div className="flex gap-1.5">
-                                                        {skills.filter(s => s.category === cat).map(skill => (
-                                                            <button
-                                                                key={skill.id}
-                                                                onClick={() => {
-                                                                    if (selectedSkills.includes(skill.id)) setSelectedSkills(selectedSkills.filter(id => id !== skill.id));
-                                                                    else setSelectedSkills([...selectedSkills, skill.id]);
-                                                                }}
-                                                                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all border ${selectedSkills.includes(skill.id)
-                                                                    ? "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm"
-                                                                    : "bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                                                                    }`}
-                                                                title={skill.description}
-                                                            >
-                                                                {skill.name.split(" ")[1] || skill.name}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <span className={`material-symbols-outlined mb-4 text-3xl ${selectedTemplate === t.id ? "text-primary-container" : "text-indigo-600 group-hover:text-white"}`}>
+                                        analytics
+                                    </span>
+                                    <h4 className={`font-bold text-lg mb-2 ${selectedTemplate === t.id ? "text-on-surface" : "group-hover:text-white"}`}>
+                                        {t.name}
+                                    </h4>
+                                    <p className={`text-sm line-clamp-2 ${selectedTemplate === t.id ? "text-on-surface-variant" : "text-on-surface-variant group-hover:text-indigo-100"}`}>
+                                        {t.description}
+                                    </p>
                                 </div>
-
-                                {/* Generate Button (Right Side, Big) */}
-                                <div className="flex-shrink-0 pt-6">
-                                    <Button
-                                        onClick={handleGenerate}
-                                        disabled={!selectedDoc || !selectedTemplate || generating}
-                                        className={`h-28 w-40 flex flex-col items-center justify-center gap-3 rounded-2xl shadow-xl transition-all duration-300 group ${
-                                            !selectedDoc 
-                                                ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" 
-                                                : "bg-slate-900 hover:bg-black text-white shadow-indigo-200 hover:shadow-2xl hover:-translate-y-1"
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Skills Row */}
+                    <div>
+                        <h3 className="text-[12px] font-semibold text-on-surface-variant uppercase tracking-[0.1em] mb-4">Expert Skills Engaged</h3>
+                        <div className="flex flex-wrap gap-3">
+                            {skills.map(skill => {
+                                const isSelected = selectedSkills.includes(skill.id);
+                                return (
+                                    <button 
+                                        key={skill.id}
+                                        onClick={() => handleSkillToggle(skill.id)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                                            isSelected 
+                                            ? "bg-primary-container text-white" 
+                                            : "bg-secondary-container/30 text-on-secondary-container border border-secondary-container/50 hover:bg-secondary-container/50"
                                         }`}
                                     >
-                                        {generating ? (
-                                            <>
-                                                <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
-                                                <span className="text-xs font-bold animate-pulse">生成中...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className={`p-3 rounded-full ${!selectedDoc ? "bg-slate-200" : "bg-indigo-600 group-hover:scale-110 transition-transform duration-300"}`}>
-                                                    <Rocket size={24} className="text-white" />
-                                                </div>
-                                                <div className="text-center">
-                                                    <span className="block text-sm font-black tracking-tight">產生報告</span>
-                                                    <span className="block text-[10px] opacity-60 font-mono mt-0.5">GENERATE</span>
-                                                </div>
-                                            </>
-                                        )}
-                                    </Button>
-                                    {!selectedDoc && (
-                                        <p className="text-[10px] text-red-500 font-bold text-center mt-2 animate-pulse">請先選擇文件</p>
-                                    )}
+                                        <span className="material-symbols-outlined text-sm" style={{fontVariationSettings: isSelected ? '"FILL" 1' : '"FILL" 0'}}>
+                                            {isSelected ? 'verified' : 'psychology_alt'}
+                                        </span>
+                                        <span className="text-sm font-semibold">{skill.name.split(" ")[1] || skill.name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Generation Canvas */}
+            <section className="px-10 py-8 pb-32 flex-1 overflow-y-auto">
+                <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    
+                    {/* Left: Editor/Preview */}
+                    <div className="lg:col-span-8 space-y-8">
+                        {generating ? (
+                             <div className="rounded-xl border-2 border-outline-variant bg-surface-container-low min-h-[600px] flex flex-col items-center justify-center p-12 text-center group transition-all editorial-shadow">
+                                <div className="relative mb-6">
+                                     <div className="w-20 h-20 bg-surface-container-lowest rounded-full flex items-center justify-center editorial-shadow animate-pulse">
+                                         <span className="material-symbols-outlined text-4xl text-primary animate-spin">autorenew</span>
+                                     </div>
                                 </div>
+                                <h2 className="text-2xl font-black text-on-surface mb-2 animate-pulse">Synthesizing Data Vectors</h2>
+                                <p className="text-on-surface-variant max-w-sm mt-2">Architect Intelligence is currently resolving multi-hop variables and executing specialized skill chains.</p>
+                             </div>
+                        ) : report ? (
+                             <div className="rounded-xl border border-outline-variant bg-surface-container-lowest min-h-[600px] flex flex-col items-center justify-center p-12 text-center group transition-all editorial-shadow">
+                                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                                    <span className="material-symbols-outlined text-4xl text-primary" style={{fontVariationSettings: '"FILL" 1'}}>task_alt</span>
+                                </div>
+                                <h2 className="text-2xl font-black text-on-surface mb-2">Report Successfully Generated</h2>
+                                <p className="text-on-surface-variant max-w-sm mb-8">Your intelligence synthesis is ready for review.</p>
+                                <button 
+                                    onClick={() => setIsOverlayOpen(true)}
+                                    className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-xl font-bold editorial-shadow hover:scale-105 transition-all"
+                                >
+                                    <span className="material-symbols-outlined">fullscreen</span>
+                                    Open Reading Mode
+                                </button>
+                             </div>
+                        ) : (
+                            <div className="rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low min-h-[600px] flex flex-col items-center justify-center p-12 text-center group transition-all">
+                                <div className="w-20 h-20 bg-surface-container-lowest rounded-full flex items-center justify-center mb-6 editorial-shadow">
+                                    <span className="material-symbols-outlined text-4xl text-outline-variant">description</span>
+                                </div>
+                                <h2 className="text-2xl font-black text-on-surface mb-2">Report Canvas Empty</h2>
+                                <p className="text-on-surface-variant max-w-sm">Configure your intelligence parameters above, select a document from the right panel, and click Generate.</p>
+                               
+                                <div className="mt-10">
+                                    <button 
+                                        onClick={handleGenerate}
+                                        disabled={!selectedDoc || !selectedTemplate}
+                                        className={`relative flex items-center gap-3 px-10 py-5 rounded-xl font-black text-lg transition-all group ${!selectedDoc ? "bg-surface-variant text-outline cursor-not-allowed" : "bg-gradient-to-br from-primary to-primary-container text-white editorial-shadow hover:scale-[1.02] active:scale-95"}`}
+                                    >
+                                        <span className={`material-symbols-outlined text-2xl transition-transform ${selectedDoc ? "group-hover:rotate-12" : ""}`}>rocket_launch</span>
+                                        <span>Generate Intelligence Report</span>
+                                        {selectedDoc && <div className="absolute -inset-1 bg-primary/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>}
+                                    </button>
+                                </div>
+                                {error && <p className="text-error font-bold mt-4 bg-error-container px-4 py-2 rounded-lg">{error}</p>}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right: Insights/Stats */}
+                    <div className="lg:col-span-4 space-y-6">
+                        <div className="p-8 rounded-xl bg-surface-container-lowest editorial-shadow">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-6">Source Intelligence</h3>
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                {documents.length === 0 ? (
+                                     <p className="text-sm text-outline">No documents available.</p>
+                                ) : (
+                                    documents.map(doc => (
+                                        <div 
+                                            key={doc.collection_name} 
+                                            onClick={() => setSelectedDoc(doc.collection_name)}
+                                            className={`flex items-start gap-4 p-3 rounded-xl cursor-pointer transition-colors border ${selectedDoc === doc.collection_name ? "bg-indigo-50 border-primary/20 shadow-sm" : "border-transparent hover:bg-surface-container-low"}`}
+                                        >
+                                            <div className={`p-2 rounded-lg ${selectedDoc === doc.collection_name ? "bg-primary text-white" : "bg-indigo-50 text-indigo-600"}`}>
+                                                <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h5 className="text-sm font-bold text-on-surface truncate">{doc.file_name}</h5>
+                                                <p className="text-[11px] text-on-surface-variant truncate">Indexed: {doc.indexed_at.substring(0, 10)}</p>
+                                            </div>
+                                            {selectedDoc === doc.collection_name && (
+                                                 <span className="material-symbols-outlined text-primary text-sm mt-1">check_circle</span>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-8 rounded-xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white editorial-shadow relative overflow-hidden">
+                            <div className="relative z-10">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-indigo-200 mb-6">Processing Power</h3>
+                                <div className="flex items-end gap-3 mb-2">
+                                    <span className="text-4xl font-black tracking-tighter">Local</span>
+                                    <span className="text-sm font-medium text-indigo-300 mb-1">{provider}</span>
+                                </div>
+                                <div className="w-full bg-white/10 h-1.5 rounded-full mt-4 overflow-hidden">
+                                    <div className={`bg-primary h-full rounded-full transition-all duration-1000 ${generating ? "w-full animate-pulse" : "w-2/3"}`}></div>
+                                </div>
+                                <p className="text-xs text-indigo-200 mt-4 leading-relaxed">
+                                    {generating ? "High-fidelity reasoning mode active. Synthesizing data..." : "Model ready. Awaiting request for document intelligence."}
+                                    <br/><br/>
+                                    <span className="opacity-70 font-mono text-[10px]">Context Window: {context_window || "Default"}</span>
+                                </p>
+                            </div>
+                            <div className="absolute -right-4 -bottom-4 opacity-10">
+                                <span className="material-symbols-outlined text-[120px]">hub</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Result Content Area */}
-                    <div className="p-8 max-w-[1200px] mx-auto min-h-[500px]">
-                        {generating ? (
-                            <div className="flex flex-col items-center justify-center p-20 text-center bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
-                                <div className="relative">
-                                    <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-8 animate-pulse">
-                                        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                                    </div>
-                                    <div className="absolute top-0 right-0 w-6 h-6 bg-emerald-400 rounded-full animate-ping" />
-                                </div>
-                                <h2 className="text-2xl font-black text-slate-800 tracking-tight">正在構建深度分析報告</h2>
-                                <p className="text-slate-500 mt-3 text-lg font-medium">AI 正在調用專家技能進行多維度解析...</p>
-                                <div className="w-full max-w-md mt-12 space-y-4">
-                                    <Skeleton className="h-3 w-full rounded-full bg-slate-100" />
-                                    <Skeleton className="h-3 w-5/6 rounded-full bg-slate-100" />
-                                    <Skeleton className="h-3 w-4/6 rounded-full bg-slate-100" />
-                                </div>
-                            </div>
-                        ) : report ? (
-                            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
-                                <div className="px-8 py-5 border-b border-slate-100 bg-white/50 backdrop-blur-sm flex items-center justify-between sticky top-0 z-10">
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-xs font-bold tracking-wide uppercase">Analysis Ready</span>
-                                        </div>
-                                        <span className="text-sm font-medium text-slate-500">
-                                            {templates.find(t => t.id === selectedTemplate)?.name}
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <Button variant="outline" size="sm" className="rounded-xl font-bold border-slate-200 hover:bg-slate-50 text-slate-600" onClick={handleCopyReport}>
-                                            <Copy size={14} className="mr-2"/> 複製全文
-                                        </Button>
-                                        <Button size="sm" className="rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-lg" onClick={handleDownloadWord}>
-                                            <Download size={14} className="mr-2"/> 下載報告 (Word)
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="p-12 min-h-[800px] bg-white">
-                                    <div className="max-w-[900px] mx-auto prose prose-slate prose-headings:font-black prose-p:text-slate-600 prose-li:text-slate-600">
-                                        <MarkdownRenderer content={report.content} />
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center text-center p-20 bg-white/40 border-4 border-dashed border-slate-200/60 rounded-[3rem] min-h-[600px] hover:bg-white/60 hover:border-indigo-200/60 transition-all duration-500 group">
-                                <div className="w-32 h-32 bg-slate-50 rounded-full flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500">
-                                    <FileText size={48} className="text-slate-300 group-hover:text-indigo-300 transition-colors" />
-                                </div>
-                                <h2 className="text-3xl font-black text-slate-300 italic uppercase tracking-widest group-hover:text-indigo-300 transition-colors">Pending Generation</h2>
-                                <p className="text-slate-400 mt-4 max-w-sm text-lg font-medium">
-                                    請從左側選擇文件，並配置上方參數以開始分析
-                                </p>
-                            </div>
-                        )}
-                    </div>
                 </div>
-            </div>
+            </section>
 
-            {/* Error Display (Floating Toast) */}
-            {error && (
-                <div className="fixed bottom-8 right-8 p-5 bg-white border-l-4 border-rose-500 shadow-2xl rounded-xl z-50 flex items-center gap-4 animate-in slide-in-from-right duration-500">
-                    <div className="p-2 bg-rose-50 rounded-full">
-                        <XCircle size={24} className="text-rose-500"/>
+            {/* Hidden Report Preview Overlay */}
+            {isOverlayOpen && (
+                <div className="fixed inset-0 z-[100] bg-on-surface/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
+                    <div className="bg-surface-container-lowest w-full max-w-5xl h-full rounded-xl flex flex-col editorial-shadow overflow-hidden">
+                        
+                        <div className="p-4 md:p-6 border-b border-surface-container flex items-center justify-between bg-surface-container-low shadow-sm z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                    <span className="material-symbols-outlined text-primary">article</span>
+                                </div>
+                                <div>
+                                    <h2 className="font-black text-lg md:text-xl tracking-tight text-on-surface">{selectedTemplateObj?.name || "Report"}</h2>
+                                    <p className="text-xs text-on-surface-variant hidden md:block">Architect Intelligence Output</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <button onClick={handleCopyReport} className="px-3 py-2 md:px-4 md:py-2 text-sm font-bold text-on-surface-variant hover:bg-white hover:shadow-sm transition-all rounded-lg flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">content_copy</span> <span className="hidden md:inline">Copy</span>
+                                </button>
+                                <button onClick={handleDownloadWord} className="px-3 py-2 md:px-4 md:py-2 text-sm font-bold text-on-surface-variant hover:bg-white hover:shadow-sm transition-all rounded-lg flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">description</span> <span className="hidden md:inline">Word</span>
+                                </button>
+                                {/* <button className="px-4 py-2 md:px-6 bg-primary text-white font-bold rounded-lg shadow-md hover:bg-primary-fixed-variant transition-colors text-sm">PDF</button> */}
+                                <button onClick={() => setIsOverlayOpen(false)} className="p-2 ml-2 hover:bg-red-50 text-red-500 rounded-full transition-colors flex items-center justify-center">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto bg-slate-100 p-4 md:p-12 relative">
+                            <article className="max-w-3xl mx-auto bg-white p-8 md:p-16 shadow-[0px_10px_40px_rgba(0,0,0,0.05)] rounded-xl min-h-[1000px] prose prose-slate">
+                                <header className="mb-12 border-b-4 border-primary pb-8">
+                                    <p className="text-xs font-black uppercase tracking-widest text-primary mb-3">Generated Report</p>
+                                    <h1 className="text-3xl md:text-4xl font-black tracking-tight text-on-surface leading-tight">
+                                        {selectedTemplateObj?.name || "Intelligence Report"}
+                                    </h1>
+                                    <p className="text-slate-500 mt-4 text-sm font-medium italic">
+                                        Source: {documents.find(d => d.collection_name === selectedDoc)?.file_name}
+                                    </p>
+                                </header>
+                                
+                                <div className="prose prose-indigo prose-headings:font-black max-w-none text-slate-800">
+                                    {report ? (
+                                        <MarkdownRenderer content={report.content} />
+                                    ) : (
+                                        <p>No content available.</p>
+                                    )}
+                                </div>
+                            </article>
+                        </div>
+
                     </div>
-                    <div>
-                        <p className="font-bold text-slate-900 text-sm">生成失敗</p>
-                        <p className="text-xs text-slate-500 mt-0.5 max-w-[200px]">{error}</p>
-                    </div>
-                    <button onClick={() => setError(null)} className="ml-4 text-slate-400 hover:text-slate-600 transition-colors">✕</button>
                 </div>
             )}
         </div>

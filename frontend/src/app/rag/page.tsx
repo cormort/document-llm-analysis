@@ -144,8 +144,8 @@ export default function RAGPage() {
     return (
         <div className="flex-1 flex flex-col bg-slate-50/50">
             <Header
-                title="RAG 智能問答"
-                subtitle="基於文件內容的精確問答系統"
+                title="RAG 智能問答 (全域檢索)"
+                subtitle="適合「大海撈針、找尋特定事實」。系統會在所有資料庫文件中尋找相關片段來回答問題。"
             />
 
             {/* Tab Navigation */}

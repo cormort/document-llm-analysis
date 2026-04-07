@@ -28,6 +28,11 @@ OpenWork
 <div className="ml-4 text-xs text-slate-400 border px-1.5 py-0.5 rounded border-slate-200">
 v2.0 Beta
 </div>
+<div className="ml-4 text-[11px] text-slate-500 hidden md:flex items-center">
+<span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-100 font-medium">
+💡 適合「深度分析」：手動指定特定文件作為上下文，請 AI 詳讀並進行多輪探討與產出
+</span>
+</div>
 </div>
 
 <PanelGroup orientation="horizontal" className="flex-1">

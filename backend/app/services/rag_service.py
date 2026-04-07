@@ -5,7 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import chromadb
 import structlog
-import torch
+
+try:
+    import torch
+except ImportError:
+    torch = None
 from app.services.context_compressor import ContextCompressor
 from app.services.graph_rag_service import graph_rag_service
 from app.services.llm_service import llm_service
@@ -503,7 +507,9 @@ class RAGService:
                 self.embedder.encode, [query], convert_to_numpy=True
             )
             query_embedding = query_embedding.tolist()
-            with CHROMADB_QUERY_LATENCY_SECONDS.labels(collection=target_collection.name).time():
+            with CHROMADB_QUERY_LATENCY_SECONDS.labels(
+                collection=target_collection.name
+            ).time():
                 results = target_collection.query(
                     query_embeddings=query_embedding, n_results=n_results
                 )
