@@ -186,7 +186,14 @@ class LLMProviders:
                 LLM_TOKEN_USAGE_TOTAL.labels(provider="OpenAI", model=model_name).inc(
                     tokens
                 )
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"]
+                # If content is a list of parts (e.g., [{"type": "text", "text": "..."}]), concatenate them.
+                if isinstance(content, list):
+                    try:
+                        content = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
+                    except Exception:
+                        content = str(content)
+                return content
         except Exception as e:
             return f"OpenAI Error: {e}"
 
@@ -253,7 +260,14 @@ class LLMProviders:
                     LLM_TOKEN_USAGE_TOTAL.labels(
                         provider=provider, model=model_name
                     ).inc(tokens)
-                return data["choices"][0]["message"]["content"]
+                content = data["choices"][0]["message"]["content"]
+                # If content is a list of parts (e.g., [{"type": "text", "text": "..."}]), concatenate them.
+                if isinstance(content, list):
+                    try:
+                        content = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
+                    except Exception:
+                        content = str(content)
+                return content
             except (
                 requests.exceptions.ConnectionError,
                 requests.exceptions.ChunkedEncodingError,
@@ -324,7 +338,14 @@ class LLMProviders:
                     LLM_TOKEN_USAGE_TOTAL.labels(
                         provider=provider, model=model_name
                     ).inc(tokens)
-                return data["choices"][0]["message"]["content"]
+                content = data["choices"][0]["message"]["content"]
+                # If content is a list of parts (e.g., [{"type": "text", "text": "..."}]), concatenate them.
+                if isinstance(content, list):
+                    try:
+                        content = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
+                    except Exception:
+                        content = str(content)
+                return content
             except (
                 requests.exceptions.ConnectionError,
                 requests.exceptions.ChunkedEncodingError,
