@@ -4,8 +4,10 @@ Unified interface for Gemini, OpenAI, and Local LLM providers.
 """
 
 import asyncio
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import AsyncGenerator
 
 import google.generativeai as genai
 import requests
@@ -63,6 +65,32 @@ class LLMProviders:
             result_preview=result[:100] if result else "None",
         )
         return result
+
+    async def stream_call(
+        self,
+        provider: str,
+        model_name: str,
+        local_url: str | None,
+        api_key_input: str | None,
+        system_prompt: str,
+        user_prompt: str,
+        **kwargs,
+    ) -> AsyncGenerator[str, None]:
+        """Unified async LLM streaming call."""
+        logger.info("LLM Streaming Request", provider=provider, model=model_name)
+
+        if provider == "Gemini":
+            async for chunk in self._stream_gemini(
+                model_name, api_key_input, system_prompt, user_prompt
+            ):
+                yield chunk
+            return
+
+        # For OpenAI-compatible providers
+        async for chunk in self._stream_openai_compatible(
+            provider, model_name, local_url, api_key_input, system_prompt, user_prompt, **kwargs
+        ):
+            yield chunk
 
     async def _call_gemini(
         self,
@@ -186,19 +214,19 @@ class LLMProviders:
                 LLM_TOKEN_USAGE_TOTAL.labels(provider="OpenAI", model=model_name).inc(
                     tokens
                 )
-                content = data["choices"][0]["message"]["content"]
-                # If content is a list of parts (e.g., [{"type": "text", "text": "..."}]), concatenate them.
-                if isinstance(content, list):
-                    try:
-                        content = "".join(
-                            part.get("text", "")
-                            if isinstance(part, dict)
-                            else str(part)
-                            for part in content
-                        )
-                    except Exception:
-                        content = str(content)
-                return content
+            content = data["choices"][0]["message"]["content"]
+            # If content is a list of parts, filter out thinking and concatenate text.
+            if isinstance(content, list):
+                text_parts = []
+                for part in content:
+                    if isinstance(part, dict):
+                        if part.get("type") == "thinking":
+                            continue
+                        text_parts.append(part.get("text", ""))
+                    else:
+                        text_parts.append(str(part))
+                content = "".join(text_parts)
+            return content
         except Exception as e:
             return f"OpenAI Error: {e}"
 
@@ -266,17 +294,17 @@ class LLMProviders:
                         provider=provider, model=model_name
                     ).inc(tokens)
                 content = data["choices"][0]["message"]["content"]
-                # If content is a list of parts (e.g., [{"type": "text", "text": "..."}]), concatenate them.
+                # If content is a list of parts, filter out thinking and concatenate text.
                 if isinstance(content, list):
-                    try:
-                        content = "".join(
-                            part.get("text", "")
-                            if isinstance(part, dict)
-                            else str(part)
-                            for part in content
-                        )
-                    except Exception:
-                        content = str(content)
+                    text_parts = []
+                    for part in content:
+                        if isinstance(part, dict):
+                            if part.get("type") == "thinking":
+                                continue
+                            text_parts.append(part.get("text", ""))
+                        else:
+                            text_parts.append(str(part))
+                    content = "".join(text_parts)
                 return content
             except (
                 requests.exceptions.ConnectionError,
@@ -337,6 +365,102 @@ class LLMProviders:
             )
 
         return []
+
+    async def _stream_gemini(
+        self,
+        model_name: str,
+        api_key_input: str | None,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> AsyncGenerator[str, None]:
+        """Native async Gemini streaming call."""
+        if not api_key_input:
+            api_key_input = self._default_api_key
+        if not api_key_input:
+            yield "⚠️ 未設定 Google API Key"
+            return
+
+        try:
+            genai.configure(api_key=api_key_input)
+            clean_model_name = model_name
+            if clean_model_name and clean_model_name.startswith("models/"):
+                clean_model_name = clean_model_name.replace("models/", "")
+
+            model = genai.GenerativeModel(
+                clean_model_name, system_instruction=system_prompt
+            )
+            response = await model.generate_content_async(user_prompt, stream=True)
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as e:
+            logger.error("Gemini Streaming Error", error=str(e))
+            yield f"Gemini Error: {e}"
+
+    async def _stream_openai_compatible(
+        self,
+        provider: str,
+        model_name: str,
+        local_url: str | None,
+        api_key_input: str | None,
+        system_prompt: str,
+        user_prompt: str,
+        **kwargs,
+    ) -> AsyncGenerator[str, None]:
+        """Streaming implementation for OpenAI-compatible providers."""
+        normalized_provider = provider.strip().lower()
+        base_url = (local_url or "").rstrip("/")
+        endpoint = f"{base_url}/chat/completions"
+
+        headers = {"Content-Type": "application/json"}
+        effective_key = api_key_input
+        if normalized_provider == "omlx":
+            from app.core.config import settings as cfg
+            effective_key = cfg.OMLX_API_KEY or api_key_input or None
+        
+        if effective_key:
+            headers["Authorization"] = f"Bearer {effective_key}"
+
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": kwargs.get("temperature", 0.7),
+            "stream": True
+        }
+
+        try:
+            # We use a non-blocking way to call requests.post with stream=True
+            # For brevity, using run_sync to wrap the generator source
+            response = await self.run_sync(
+                requests.post,
+                endpoint,
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=kwargs.get("timeout", 900)
+            )
+            response.raise_for_status()
+
+            for line in response.iter_lines():
+                if line:
+                    line_str = line.decode("utf-8")
+                    if line_str.startswith("data: "):
+                        data_str = line_str[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            content = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if content:
+                                yield content
+                        except Exception:
+                            continue
+        except Exception as e:
+            logger.error(f"{provider} Streaming Error", error=str(e))
+            yield f"{provider} Error: {e}"
 
     def _list_gemini_models(self, api_key_input: str | None) -> list[str]:
         """List Gemini models."""

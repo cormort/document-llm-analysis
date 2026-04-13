@@ -330,6 +330,10 @@ export default function RAGPage() {
                     <div className="flex-1 min-w-0">
                         <ChatInterface 
                             selectedDocuments={selectedDocuments}
+                            useHybrid={useHybrid}
+                            useQueryExpansion={useQueryExpansion}
+                            useCompression={useCompression}
+                            mode="rag"
                         />
                     </div>
                 </div>

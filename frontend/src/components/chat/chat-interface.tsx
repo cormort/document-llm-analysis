@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState, FormEvent } from "react";
-import { 
-    Send, 
-    Bot, 
-    Loader2, 
+import {
+    Send,
+    Bot,
+    Loader2,
     AlertTriangle,
     Search,
     MessageSquare,
@@ -15,12 +15,16 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useChatStore, ChatMessage } from "@/stores/chat-store";
-import { useSettingsStore } from "@/stores/settings-store";
-import { queryAgentStream } from "@/lib/api";
+import { useChat } from "@/hooks/useChat";
 import { MarkdownRenderer } from "./markdown-renderer";
 
 interface ChatInterfaceProps {
     selectedDocuments: string[];
+    useHybrid?: boolean;
+    useQueryExpansion?: boolean;
+    useCompression?: boolean;
+    useRerank?: boolean;
+    mode?: "agent" | "rag";
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
@@ -33,7 +37,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                     <Bot size={16} />
                 </div>
             )}
-            
+
             <div
                 className={`max-w-[80%] rounded-2xl px-5 py-3.5 shadow-sm transition-all duration-200 ${isUser
                     ? "bg-blue-600/90 text-white shadow-blue-500/20"
@@ -72,54 +76,32 @@ function StreamingIndicator() {
     );
 }
 
-export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
+export function ChatInterface({
+    selectedDocuments,
+    useHybrid,
+    useQueryExpansion,
+    useCompression,
+    useRerank,
+    mode
+}: ChatInterfaceProps) {
     const [input, setInput] = useState("");
     const scrollRef = useRef<HTMLDivElement>(null);
-    const {
-        messages,
-        isStreaming,
-        addMessage,
-        updateLastMessage,
-        setStreaming,
-    } = useChatStore();
-    const { provider, model_name, local_url, api_key } = useSettingsStore();
+    const { messages, isStreaming } = useChatStore();
+    const { sendMessage } = useChat({
+        selectedDocuments,
+        useHybrid,
+        useQueryExpansion,
+        useCompression,
+        useRerank,
+        mode,
+    });
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isStreaming || selectedDocuments.length === 0) return;
-
         const question = input.trim();
         setInput("");
-
-        // Add user message
-        addMessage({ role: "user", content: question });
-
-        // Start streaming
-        setStreaming(true);
-        addMessage({ role: "assistant", content: "" });
-
-        try {
-            // Switch to Agent Stream
-            const stream = queryAgentStream({
-                message: question,
-                llm_config: {
-                    provider, 
-                    model_name,
-                    local_url,
-                    api_key
-                }
-            });
-
-            let fullContent = "";
-            for await (const chunk of stream) {
-                fullContent += chunk;
-                updateLastMessage(fullContent);
-            }
-        } catch (error) {
-            updateLastMessage(`❌ 發生錯誤: ${error instanceof Error ? error.message : "Unknown error"}`);
-        } finally {
-            setStreaming(false);
-        }
+        await sendMessage(question);
     };
 
     return (
@@ -171,13 +153,13 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
                              <MessageSquare size={18} className="opacity-50" />
                         </div>
                     </div>
-                    
+
                     <Button
                         type="submit"
                         disabled={isStreaming || !input.trim() || selectedDocuments.length === 0}
                         className={`h-12 w-12 rounded-xl p-0 transition-all duration-300 shadow-md ${
                             !input.trim() || isStreaming
-                                ? "bg-slate-100 text-slate-400 shadow-none" 
+                                ? "bg-slate-100 text-slate-400 shadow-none"
                                 : "bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-lg hover:scale-105 active:scale-95"
                         }`}
                     >
@@ -188,7 +170,7 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
                         )}
                     </Button>
                 </form>
-                
+
                 {selectedDocuments.length === 0 && (
                     <div className="flex items-center justify-center gap-2 mt-3 text-xs text-amber-600 animate-in fade-in slide-in-from-bottom-2">
                         <AlertTriangle size={14} />

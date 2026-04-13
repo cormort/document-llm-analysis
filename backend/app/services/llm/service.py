@@ -7,7 +7,7 @@ import asyncio
 import datetime
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import google.generativeai as genai
 import structlog
@@ -566,19 +566,21 @@ class LLMService:
 
         system_prompt = """你是一位專業的文件分析助手。請根據提供的上下文內容回答問題。
 
-規則：
-1. 只使用上下文中的資訊回答
-2. 如果上下文中沒有相關資訊，請明確告知使用者
-3. 引用具體內容時請標註來源
-4. 若使用者要求「摘要」、「總結」或「重點整理」，請直接綜合這些上下文提供摘要，展現對文件的理解，絕對不要回答「請提供文件」。
-5. 請勿在回覆中加入思考過程或任何非答案的訊息，只返回最終答案文字。"""
+**核心規則：**
+1. **直接回答**：直接開始回答內容，絕對禁止重複列出使用者的指令內容、限制條件或數據塊清單（例如禁止出現 "Task:", "Chunk 1:", "Constraint:" 等字眼）。
+2. **格式優雅**：請務必使用 Markdown 格式，適當使用 `###` 標題、粗體與列表來增加可讀性，嚴禁輸出一整塊密集的文字。
+3. **忠於真實**：只使用上下文中的資訊回答。如果上下文中沒有相關資訊，請明確告知。
+4. **標註來源**：引用具體數據或論點時，請簡要標註來源，如 `[資料來源1]`。
+5. **禁止思考內容**：不要在回覆中加入 `<thought>` 標記、思考過程或任何非最終答案的訊息。"""
 
-        user_prompt = f"""上下文：
+        user_prompt = f"""請精簡、專業地摘要或回答以下問題：
+
+【上下文內容】：
 {context}
 
-問題：{question}
+【使用者問題】：{question}
 
-請根據上下文回答問題："""
+請直接開始您的專業回答："""
 
         return await self._call_provider(
             provider,
@@ -589,6 +591,54 @@ class LLMService:
             user_prompt,
             **kwargs,
         )
+
+    async def rag_answer_stream(
+        self,
+        question: str,
+        context: str,
+        provider=None,
+        model_name=None,
+        local_url=None,
+        api_key=None,
+        **kwargs,
+    ) -> AsyncGenerator[str, None]:
+        """Streaming version of RAG answer."""
+        if not provider:
+            config = self.get_routing_config("smart")
+            provider = config["provider"]
+            model_name = config["model_name"]
+            local_url = config.get("local_url")
+
+        api_key_input = api_key or self.api_key
+
+        system_prompt = """你是一位專業的文件分析助手。請根據提供的上下文內容回答問題。
+
+**核心規則：**
+1. **直接回答**：直接開始回答內容，絕對禁止重複列出使用者的指令內容、限制條件或數據塊清單（例如禁止出現 "Task:", "Chunk 1:", "Constraint:" 等字眼）。
+2. **格式優雅**：請務必使用 Markdown 格式，適當使用 `###` 標題、粗體與列表來增加可讀性，嚴禁輸出一整塊密集的文字。
+3. **忠於真實**：只使用上下文中的資訊回答。如果上下文中沒有相關資訊，請明確告知。
+4. **標註來源**：引用具體數據或論點時，請簡要標註來源。
+5. **禁止思考內容**：不要在回覆中加入思考過程或任何非最終答案的訊息。"""
+
+        user_prompt = f"""請精簡、專業地摘要或回答以下問題：
+
+【上下文內容】：
+{context}
+
+【使用者問題】：{question}
+
+請直接開始您的專業回答："""
+
+        async for chunk in self._providers.stream_call(
+            provider,
+            model_name,
+            local_url,
+            api_key_input,
+            system_prompt,
+            user_prompt,
+            **kwargs,
+        ):
+            yield chunk
 
     # ==========================================
     # Excel AI Tasks

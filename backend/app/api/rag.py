@@ -8,6 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
+from app.core.text_cleaner import clean_rag_content
+
 from app.models.rag import (
     DocumentInfo,
     RAGIndexRequest,
@@ -22,20 +24,17 @@ from app.services.rag_service import rag_service
 router = APIRouter()
 
 
-async def stream_rag_response(answer: str) -> AsyncGenerator[dict[str, str], None]:
-    """Stream RAG response content for SSE."""
-    words = (await answer).split() if asyncio.iscoroutine(answer) else answer.split()
-    # If answer is already a string, we just split it.
-    # But wait, rag_answer is async now.
-
-    # Correction: stream_rag_response should take the awaited result.
-    buffer = ""
-    for i, word in enumerate(words):
-        buffer += word + " "
-        if i % 3 == 0 or i == len(words) - 1:
-            yield {"event": "message", "data": buffer}
-            buffer = ""
-            await asyncio.sleep(0.02)
+async def stream_rag_response(stream: AsyncGenerator[str, None]) -> AsyncGenerator[dict[str, str], None]:
+    """Stream real RAG response content via SSE with filtering."""
+    from app.services.llm.stream_filter import StreamFilter
+    
+    sf = StreamFilter()
+    async for chunk in sf.filter_stream(stream):
+        if chunk:
+            # We wrap the content in a way that the frontend expects
+            # Usually SSE data is just the text or a JSON
+            yield {"event": "message", "data": chunk}
+    
     yield {"event": "done", "data": "[DONE]"}
 
 
@@ -46,7 +45,9 @@ async def query_documents(request: RAGQueryRequest) -> RAGQueryResponse:
         api_key = request.config.api_key
 
         if not request.collection_names:
-            raise HTTPException(status_code=400, detail="未提供查詢集合名稱 (collection_names is empty)")
+            raise HTTPException(
+                status_code=400, detail="未提供查詢集合名稱 (collection_names is empty)"
+            )
 
         # Search across collections
         if len(request.collection_names) > 1:
@@ -80,7 +81,7 @@ async def query_documents(request: RAGQueryRequest) -> RAGQueryResponse:
             context = optimized["context"]
             sources = optimized["sources"]
 
-        # Generate answer
+        # Generate answer and clean LLM output (removes thinking blocks, XML tags, etc.)
         answer = await llm_service.rag_answer(
             question=request.question,
             context=context,
@@ -90,6 +91,7 @@ async def query_documents(request: RAGQueryRequest) -> RAGQueryResponse:
             context_window=request.config.context_window,
             api_key=api_key,
         )
+        answer = clean_rag_content(answer)
 
         return RAGQueryResponse(answer=answer, sources=sources)
     except Exception as e:
@@ -103,11 +105,18 @@ async def query_documents_stream(request: RAGQueryRequest) -> EventSourceRespons
         api_key = request.config.api_key
 
         if not request.collection_names:
-            raise HTTPException(status_code=400, detail="未提供查詢集合名稱 (collection_names is empty)")
+            raise HTTPException(
+                status_code=400, detail="未提供查詢集合名稱 (collection_names is empty)"
+            )
 
         # Check for summary intent to boost retrieved chunks
-        is_summary = any(k in request.question.lower() for k in ["摘要", "總結", "重點", "大綱", "結論", "summary", "summarize"])
-        active_n_results = 25 if is_summary and request.n_results < 25 else request.n_results
+        is_summary = any(
+            k in request.question.lower()
+            for k in ["摘要", "總結", "重點", "大綱", "結論", "summary", "summarize"]
+        )
+        active_n_results = (
+            25 if is_summary and request.n_results < 25 else request.n_results
+        )
 
         # Search across collections
         if len(request.collection_names) > 1:
@@ -138,9 +147,10 @@ async def query_documents_stream(request: RAGQueryRequest) -> EventSourceRespons
                 else {},
             )
             context = optimized["context"]
+        # LLM stream output is filtered by stream_rag_response → StreamFilter
 
-        # Generate answer
-        answer = await llm_service.rag_answer(
+        # Generate real streaming answer
+        stream = llm_service.rag_answer_stream(
             question=request.question,
             context=context,
             provider=request.config.provider,
@@ -149,8 +159,8 @@ async def query_documents_stream(request: RAGQueryRequest) -> EventSourceRespons
             context_window=request.config.context_window,
             api_key=api_key,
         )
-
-        return EventSourceResponse(stream_rag_response(answer))
+ 
+        return EventSourceResponse(stream_rag_response(stream))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

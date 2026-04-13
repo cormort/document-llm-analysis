@@ -44,6 +44,7 @@ export function TabbedPanel() {
            <ChatInterface 
              selectedDocuments={selectedDocuments} 
              useHybrid={true}
+             mode="rag"
            />
         ) : (
           <div className="h-full w-full">
