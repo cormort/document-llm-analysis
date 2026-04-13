@@ -102,7 +102,9 @@ class LLMService:
         """Get optimal LLM configuration based on task type from global settings."""
         if task_type == "fast":
             provider = settings.LLM_FAST_PROVIDER
-            local_url = settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_FAST_URL
+            local_url = (
+                settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_FAST_URL
+            )
             return {
                 "provider": provider,
                 "model_name": settings.LLM_FAST_MODEL,
@@ -111,7 +113,9 @@ class LLMService:
             }
         elif task_type == "smart":
             provider = settings.LLM_SMART_PROVIDER
-            local_url = settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_SMART_URL
+            local_url = (
+                settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_SMART_URL
+            )
             return {
                 "provider": provider,
                 "model_name": settings.LLM_SMART_MODEL,
@@ -120,7 +124,9 @@ class LLMService:
             }
 
         provider = settings.LLM_SMART_PROVIDER
-        local_url = settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_SMART_URL
+        local_url = (
+            settings.LLM_OMLX_URL if provider == "omlx" else settings.LLM_SMART_URL
+        )
         return {
             "provider": provider,
             "model_name": settings.LLM_SMART_MODEL,
@@ -386,10 +392,20 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        system_prompt = f"你是一位命名實體識別專家。請從文字中識別並標註以下類型的實體：{', '.join(entity_types)}。"
+        system_prompt = f"""你是一位命名實體識別專家。請從文字中識別並標註以下類型的實體：{", ".join(entity_types)}。
+請務必以 JSON 格式輸出，結構必須包含 'entities' 陣列與 'relations' 陣列：
+{{
+    "entities": [
+        {{"name": "實體名稱", "type": "實體類型", "description": "描述"}}
+    ],
+    "relations": [
+        {{"subject": "主體", "object": "受體", "relation": "關係"}}
+    ]
+}}
+如果沒有找到，請回傳空的陣列。不要輸出任何其他說明文字。"""
         user_prompt = text
 
-        return await self._call_provider(
+        response = await self._call_provider(
             provider,
             model_name,
             local_url,
@@ -398,6 +414,31 @@ class LLMService:
             user_prompt,
             **kwargs,
         )
+
+        import json
+        import re
+
+        try:
+            if "```json" in response:
+                match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
+                if match:
+                    response = match.group(1)
+            elif "```" in response:
+                match = re.search(r"```\s*(.*?)\s*```", response, re.DOTALL)
+                if match:
+                    response = match.group(1)
+
+            # Remove any leading text that isn't part of JSON
+            response = response.strip()
+            if not response.startswith("{"):
+                match = re.search(r"\{.*\}", response, re.DOTALL)
+                if match:
+                    response = match.group(0)
+
+            return json.loads(response)
+        except Exception as e:
+            logger.warning("Failed to parse extract_entities JSON", error=str(e))
+            return {"entities": [], "relations": []}
 
     # ==========================================
     # Report Generation
@@ -529,7 +570,8 @@ class LLMService:
 1. 只使用上下文中的資訊回答
 2. 如果上下文中沒有相關資訊，請明確告知使用者
 3. 引用具體內容時請標註來源
-4. 若使用者要求「摘要」、「總結」或「重點整理」，請直接綜合這些上下文提供摘要，展現對文件的理解，絕對不要回答「請提供文件」。"""
+4. 若使用者要求「摘要」、「總結」或「重點整理」，請直接綜合這些上下文提供摘要，展現對文件的理解，絕對不要回答「請提供文件」。
+5. 請勿在回覆中加入思考過程或任何非答案的訊息，只返回最終答案文字。"""
 
         user_prompt = f"""上下文：
 {context}
