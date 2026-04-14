@@ -37,15 +37,13 @@ import {
 } from "lucide-react";
 
 import { useSettingsStore } from "@/stores/settings-store";
-import { useDocumentStore } from "@/stores/document-store";
+import { useDataFileStore } from "@/stores/data-file-store";
 
 export default function StatisticsPage() {
     const { provider, model_name, local_url, api_key } = useSettingsStore();
     const config = { provider, model_name, local_url, api_key };
 
-    // Global document store
-    const { documents: allDocs, loading: loadingDocs, fetchDocuments } = useDocumentStore();
-    const documents = allDocs.filter(d => d.file_name.match(/\.(csv|xlsx|xls|json)$/i));
+    const { files, loading: loadingDocs, fetchFiles } = useDataFileStore();
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState("profiling");
@@ -68,15 +66,11 @@ export default function StatisticsPage() {
     const [selectedInferenceCols, setSelectedInferenceCols] = useState<string[]>([]);
 
     useEffect(() => {
-        fetchDocuments();
-    }, [fetchDocuments]);
+        fetchFiles();
+    }, [fetchFiles]);
 
-    const handleUploadComplete = () => {
-        fetchDocuments();
-    };
-
-    const handleSelectDoc = async (collectionName: string) => {
-        setSelectedDoc(collectionName);
+    const handleSelectDoc = async (fileName: string) => {
+        setSelectedDoc(fileName);
         setDiagnostics(null);
         setEdaResults(null);
         setTestResults(null);
@@ -85,29 +79,24 @@ export default function StatisticsPage() {
         setSelectedInferenceCols([]);
 
         // Auto-run diagnostic
-        const doc = documents.find(d => d.collection_name === collectionName);
-        if (doc) {
-            setProcessing(true);
-            try {
-                const res = await getDiagnostic({
-                    file_path: doc.file_name,
-                    config: config
-                });
-                setDiagnostics(res);
-                setAnalysisProgress(p => ({ ...p, profiling: "done" }));
-            } catch (err) {
-                console.error(err);
-                setAnalysisProgress(p => ({ ...p, profiling: "error" }));
-            } finally {
-                setProcessing(false);
-            }
+        setProcessing(true);
+        try {
+            const res = await getDiagnostic({
+                file_path: fileName,
+                config: config
+            });
+            setDiagnostics(res);
+            setAnalysisProgress(p => ({ ...p, profiling: "done" }));
+        } catch (err) {
+            console.error(err);
+            setAnalysisProgress(p => ({ ...p, profiling: "error" }));
+        } finally {
+            setProcessing(false);
         }
     };
 
     const handleFullAnalysis = async () => {
         if (!selectedDoc) return;
-        const doc = documents.find(d => d.collection_name === selectedDoc);
-        if (!doc) return;
 
         setIsFullAnalysis(true);
         setAnalysisProgress({ profiling: "running", correlation: "idle", inference: "idle" });
@@ -115,7 +104,7 @@ export default function StatisticsPage() {
         try {
             // Step 1: Profiling
             const profilingRes = await getDiagnostic({
-                file_path: doc.file_name,
+                file_path: selectedDoc,
                 config: config
             });
             setDiagnostics(profilingRes);
@@ -123,7 +112,7 @@ export default function StatisticsPage() {
 
             // Step 2: Correlation
             const corrRes = await performEDA({
-                file_path: doc.file_name,
+                file_path: selectedDoc,
                 analysis_type: "correlation",
                 params: {},
                 config: config,
@@ -140,7 +129,7 @@ export default function StatisticsPage() {
             if (numCols.length > 0) {
                 const targetCols = numCols.slice(0, 1);
                 const testRes = await performStatTest({
-                    file_path: doc.file_name,
+                    file_path: selectedDoc,
                     test_type: "shapiro",
                     target_columns: targetCols,
                     config: config
@@ -160,11 +149,10 @@ export default function StatisticsPage() {
         setProcessing(true);
         if (type === "correlation") setEdaResults(null);
         else if (type === "groupby") setEdaResults(null);
-        
+
         try {
-            const doc = documents.find(d => d.collection_name === selectedDoc);
             const res = await performEDA({
-                file_path: doc!.file_name,
+                file_path: selectedDoc,
                 analysis_type: type,
                 params: manualParams || {},
                 config: config
@@ -187,9 +175,8 @@ export default function StatisticsPage() {
         setProcessing(true);
         setTestResults(null);
         try {
-            const doc = documents.find(d => d.collection_name === selectedDoc);
             const res = await performStatTest({
-                file_path: doc!.file_name,
+                file_path: selectedDoc,
                 test_type: type,
                 target_columns: selectedInferenceCols,
                 config: config
@@ -241,7 +228,7 @@ export default function StatisticsPage() {
 
 
     // Derived props
-    const currentFilePath = selectedDoc ? documents.find(d => d.collection_name === selectedDoc)?.file_name || null : null;
+    const currentFilePath = selectedDoc;
 
     return (
         <div className="flex h-screen bg-slate-50/50 overflow-hidden font-sans">
@@ -258,7 +245,7 @@ export default function StatisticsPage() {
                 </div>
                 
                 <div className="p-6 pb-2 border-b border-slate-100/50">
-                     <FileUploader onUploadComplete={handleUploadComplete} skipIndex />
+                     <FileUploader onUploadComplete={fetchFiles} skipIndex />
                      <p className="text-[10px] text-slate-400 mt-3 text-center font-medium">支援 CSV, Excel, JSON</p>
                 </div>
 
@@ -269,27 +256,27 @@ export default function StatisticsPage() {
                             <div className="space-y-3 px-2">
                                 {[1, 2, 3].map(i => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}
                             </div>
-                        ) : documents.length === 0 ? (
+                        ) : files.length === 0 ? (
                             <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-xl m-2">
                                 <p className="text-sm text-slate-400 font-medium">尚無數據文件</p>
                             </div>
                         ) : (
-                            documents.map(doc => (
+                            files.map(f => (
                                 <button
-                                    key={doc.collection_name}
-                                    onClick={() => handleSelectDoc(doc.collection_name)}
+                                    key={f.file_name}
+                                    onClick={() => handleSelectDoc(f.file_name)}
                                     className={`w-full text-left p-3 rounded-xl text-sm transition-all duration-300 group ${
-                                        selectedDoc === doc.collection_name
+                                        selectedDoc === f.file_name
                                             ? "bg-indigo-50/80 border border-indigo-200 text-indigo-700 shadow-sm ring-1 ring-indigo-100"
                                             : "hover:bg-white hover:shadow-md border border-transparent text-slate-600 hover:text-slate-900"
                                     }`}
                                 >
                                     <div className="font-bold truncate flex items-center gap-2">
-                                        {selectedDoc === doc.collection_name ? <CheckCircle2 size={14} className="text-indigo-500"/> : <LayoutGrid size={14} className="text-slate-300 group-hover:text-slate-500"/>}
-                                        {doc.file_name}
+                                        {selectedDoc === f.file_name ? <CheckCircle2 size={14} className="text-indigo-500"/> : <LayoutGrid size={14} className="text-slate-300 group-hover:text-slate-500"/>}
+                                        {f.file_name}
                                     </div>
                                     <div className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 pl-6 font-mono opacity-70">
-                                        <Clock size={10} /> <span>{doc.indexed_at.slice(0, 10)}</span>
+                                        <Clock size={10} /> <span>{new Date(parseInt(f.modified_at) * 1000).toISOString().slice(0, 10)}</span>
                                     </div>
                                 </button>
                             ))

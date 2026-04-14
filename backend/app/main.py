@@ -13,6 +13,7 @@ from app.api import (
     agent,
     auth,
     batch,
+    data_files,
     health,
     ip_control,
     llm,
@@ -97,6 +98,7 @@ app.include_router(query.router, prefix="/api/query", tags=["Query"])
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(stats.router, prefix="/api/stats", tags=["Statistics"])
 app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])
+app.include_router(data_files.router, prefix="/api/data-files", tags=["Data Files"])
 app.include_router(modeling.router, prefix="/api/modeling", tags=["Modeling"])
 app.include_router(agent.router, prefix="/api/agent", tags=["Agent"])
 app.include_router(mcp_tools.router, prefix="/api", tags=["MCP Tools"])
