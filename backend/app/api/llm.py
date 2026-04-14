@@ -189,22 +189,11 @@ async def generate_query(request: QueryRequest | FileQueryRequest) -> LLMRespons
 
         # Handle File Query
         if isinstance(request, FileQueryRequest) or hasattr(request, "file_path"):
-            import os
-
             import pandas as pd
 
-            from app.utils.excel_processor import smart_read_excel
+            from app.utils.file_resolver import load_dataframe
 
-            file_path = request.file_path
-            ext = os.path.splitext(file_path)[1].lower()
-            df = None
-
-            if ext == ".csv":
-                df = pd.read_csv(file_path)
-            elif ext in [".xlsx", ".xls"]:
-                df = smart_read_excel(file_path)
-            elif ext == ".json":
-                df = pd.read_json(file_path)
+            df = load_dataframe(request.file_path)
 
             if df is not None:
                 # Prepare Schema Info
