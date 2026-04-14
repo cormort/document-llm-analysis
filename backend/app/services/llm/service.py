@@ -533,11 +533,12 @@ class LLMService:
 
 請生成 Pandas 程式碼："""
 
+        api_key = kwargs.pop("api_key", self.api_key)
         return await self._call_provider(
             provider,
             model_name,
             local_url,
-            self.api_key,
+            api_key,
             system_prompt,
             user_prompt,
             **kwargs,
