@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,35 @@ export default function QueryPage() {
         } finally {
             setProcessing(false);
         }
+    };
+
+    const exportCSV = (data: Record<string, unknown>[]) => {
+        if (!data.length) return;
+        const headers = Object.keys(data[0]);
+        const csv = [
+            headers.join(","),
+            ...data.map(r => headers.map(h => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","))
+        ].join("\n");
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
+        a.download = "查詢結果.csv";
+        a.click();
+    };
+
+    const exportExcel = (data: Record<string, unknown>[]) => {
+        if (!data.length) return;
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "查詢結果");
+        XLSX.writeFile(wb, "查詢結果.xlsx");
+    };
+
+    const exportJSON = (data: Record<string, unknown>[]) => {
+        if (!data.length) return;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+        a.download = "查詢結果.json";
+        a.click();
     };
 
     const formatSize = (bytes: number) => {
@@ -242,11 +272,18 @@ export default function QueryPage() {
                         {!processing && queryResult && (
                             <>
                                 <Card className="overflow-hidden border-slate-200 shadow-sm">
-                                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-2">
                                         <h3 className="font-semibold text-slate-700 flex items-center gap-2">
                                             <BarChart3 size={18} className="text-emerald-500"/> 執行結果
+                                            {queryResult.summary && <span className="text-xs text-slate-500 font-normal">{queryResult.summary}</span>}
                                         </h3>
-                                        <span className="text-xs text-slate-500">{queryResult.summary}</span>
+                                        {queryResult.success && queryResult.data && queryResult.data.length > 0 && (
+                                            <div className="flex gap-2">
+                                                <button onClick={() => exportCSV(queryResult.data as Record<string, unknown>[])} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">CSV</button>
+                                                <button onClick={() => exportExcel(queryResult.data as Record<string, unknown>[])} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">Excel</button>
+                                                <button onClick={() => exportJSON(queryResult.data as Record<string, unknown>[])} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">JSON</button>
+                                            </div>
+                                        )}
                                     </div>
                                     {queryResult.success ? (
                                         <div className="overflow-x-auto">
