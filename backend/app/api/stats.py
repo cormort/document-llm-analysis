@@ -508,7 +508,7 @@ async def analyze_dataset_holistically(
 ) -> DatasetAnalysisResponse:
     """Generate holistic analysis for multiple fields."""
     interpretation = await interpret_dataset_holistically(
-        columns_stats=request.columns_stats,
+        summary_text=request.summary_text,
         provider=request.config.provider,
         model_name=request.config.model_name,
         local_url=request.config.local_url,

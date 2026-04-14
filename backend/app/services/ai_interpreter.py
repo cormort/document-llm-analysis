@@ -340,7 +340,7 @@ async def suggest_feature_engineering(
 
 
 async def interpret_dataset_holistically(
-    columns_stats: list[dict],
+    summary_text: str,
     provider: str,
     model_name: str,
     local_url: str,
@@ -348,25 +348,13 @@ async def interpret_dataset_holistically(
     context_window: int = 16384,
 ) -> str:
     """
-    Generate AI holistic analysis for the dataset based on multiple fields.
+    Generate AI holistic analysis for the dataset based on pre-computed summary stats.
     """
 
-    # Format the stats for the prompt
-    stats_text = ""
-    for col in columns_stats:
-        stats_text += f"""
-### 欄位：{col.get("name")}
-- 平均值: {col.get("mean")}
-- 標準差: {col.get("std")}
-- 偏度: {col.get("skewness")}
-- 峰度: {col.get("kurtosis")}
-- 範例值: {col.get("sample_values")}
-"""
+    prompt = f"""請針對這份資料集的統計摘要進行「全域性 (Holistic) 綜合分析」。我們不只看單一欄位，而是要找出這些變數組合背後的整體故事。
 
-    prompt = f"""請針對這份資料集的關鍵欄位進行「全域性 (Holistic) 綜合分析」。我們不只看單一欄位，而是要找出這些變數組合背後的整體故事。
-
-【資料集關鍵欄位摘要】
-{stats_text}
+【資料集統計摘要】
+{summary_text}
 
 請扮演「資深資料科學家」或「高階策略顧問」，提供一份宏觀的分析報告 (繁體中文)：
 

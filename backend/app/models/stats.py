@@ -105,7 +105,7 @@ class FeatureSuggestionsResponse(BaseModel):
 
 
 class DatasetAnalysisRequest(BaseModel):
-    columns_stats: list[dict[str, Any]]
+    summary_text: str
     config: LLMConfig = Field(default_factory=LLMConfig)
 
 
