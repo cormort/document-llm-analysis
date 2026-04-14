@@ -155,18 +155,20 @@ class DuckDBService:
         result = self.conn.execute("SHOW TABLES").fetchdf()
         return result["name"].tolist() if not result.empty else []
 
-    def generate_schema_description(self, table_name: str) -> str:
+    def generate_schema_description(self, table_name: str, max_chars: int = 4000) -> str:
         """
         Generate a human-readable schema description for LLM prompts.
 
         Args:
             table_name: Name of the table
+            max_chars: Maximum characters for the description to keep LLM prompts manageable
 
         Returns:
             Formatted schema description string
         """
         stats = self.get_table_stats(table_name)
-        sample = self.get_table_sample(table_name, 3)
+        # Use 1 sample row to keep prompt compact for wide tables
+        sample = self.get_table_sample(table_name, 1)
 
         lines = [
             f"Table: {table_name}",
@@ -180,7 +182,10 @@ class DuckDBService:
         lines.append("\nSample Data:")
         lines.append(sample.to_markdown(index=False))
 
-        return "\n".join(lines)
+        desc = "\n".join(lines)
+        if len(desc) > max_chars:
+            desc = desc[:max_chars] + f"\n...(schema truncated at {max_chars} chars)"
+        return desc
 
     def close(self) -> None:
         """Close the DuckDB connection."""
