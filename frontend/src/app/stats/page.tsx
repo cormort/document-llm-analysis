@@ -258,7 +258,7 @@ export default function StatisticsPage() {
                 </div>
                 
                 <div className="p-6 pb-2 border-b border-slate-100/50">
-                     <FileUploader onUploadComplete={handleUploadComplete} />
+                     <FileUploader onUploadComplete={handleUploadComplete} skipIndex />
                      <p className="text-[10px] text-slate-400 mt-3 text-center font-medium">支援 CSV, Excel, JSON</p>
                 </div>
 

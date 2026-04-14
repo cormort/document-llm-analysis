@@ -8,10 +8,12 @@ import { UploadCloud, CheckCircle2 } from "lucide-react";
 
 export function FileUploader({
     onUploadComplete,
-    className
+    className,
+    skipIndex = false,
 }: {
     onUploadComplete: () => void;
     className?: string;
+    skipIndex?: boolean;
 }) {
     const [isUploading, setIsUploading] = useState(false);
     const [chunkingStrategy, setChunkingStrategy] = useState<"semantic" | "fixed">("semantic");
@@ -31,6 +33,12 @@ export function FileUploader({
             const uploadRes = await uploadFile(file);
             if (!uploadRes.success) {
                 setError(uploadRes.message || "上傳失敗");
+                return;
+            }
+
+            if (skipIndex) {
+                setSuccess(`✓ ${file.name} 已成功上傳`);
+                onUploadComplete();
                 return;
             }
 
@@ -59,30 +67,32 @@ export function FileUploader({
                     <p className="text-sm font-medium text-slate-700">點擊或拖曳檔案至此</p>
                     <p className="text-xs text-slate-500 mt-1">支援 PDF, TXT, DOCX, XLSX, CSV, JSON</p>
                 </div>
-                <div className="flex items-center gap-4 py-1">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="strategy"
-                            checked={chunkingStrategy === "semantic"}
-                            onChange={() => setChunkingStrategy("semantic")}
-                            disabled={isUploading}
-                            className="w-3 h-3 text-blue-600"
-                        />
-                        <span className="text-xs font-medium text-slate-600">語意切分 (精確)</span>
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="strategy"
-                            checked={chunkingStrategy === "fixed"}
-                            onChange={() => setChunkingStrategy("fixed")}
-                            disabled={isUploading}
-                            className="w-3 h-3 text-blue-600"
-                        />
-                        <span className="text-xs font-medium text-slate-600">固定長度</span>
-                    </label>
-                </div>
+                {!skipIndex && (
+                    <div className="flex items-center gap-4 py-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="strategy"
+                                checked={chunkingStrategy === "semantic"}
+                                onChange={() => setChunkingStrategy("semantic")}
+                                disabled={isUploading}
+                                className="w-3 h-3 text-blue-600"
+                            />
+                            <span className="text-xs font-medium text-slate-600">語意切分 (精確)</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="strategy"
+                                checked={chunkingStrategy === "fixed"}
+                                onChange={() => setChunkingStrategy("fixed")}
+                                disabled={isUploading}
+                                className="w-3 h-3 text-blue-600"
+                            />
+                            <span className="text-xs font-medium text-slate-600">固定長度</span>
+                        </label>
+                    </div>
+                )}
 
                 <input
                     type="file"
@@ -100,7 +110,7 @@ export function FileUploader({
                     className="cursor-pointer"
                 >
                     <label htmlFor="file-upload">
-                        {isUploading ? "正在索引..." : "選擇檔案並上傳"}
+                        {isUploading ? (skipIndex ? "正在上傳..." : "正在索引...") : "選擇檔案並上傳"}
                     </label>
                 </Button>
                 {error && <p className="text-xs text-red-500 mt-2">{error}</p>}

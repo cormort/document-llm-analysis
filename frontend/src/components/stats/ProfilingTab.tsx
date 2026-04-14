@@ -343,17 +343,6 @@ function DatasetAnalysisSection({ diagnostics }: { diagnostics: DiagnosticRespon
         setAnalysis("");
         
         try {
-            // Select relevant numeric columns (up to 12)
-            const numericCols = diagnostics.quality_report
-                .filter((c: DataQualityItem) => c.dtype.includes('int') || c.dtype.includes('float'))
-                .slice(0, 12);
-            
-            const columnsStats = numericCols.map((col: DataQualityItem) => ({
-                name: col.column,
-                ...((diagnostics.summary_stats?.[col.column] as Record<string, unknown>) || {}),
-                sample_values: col.sample_values
-            }));
-
             const config: LLMConfig = {
                 provider,
                 model_name: model_name || undefined,
@@ -362,7 +351,7 @@ function DatasetAnalysisSection({ diagnostics }: { diagnostics: DiagnosticRespon
             };
 
             const data = await getDatasetAnalysis({
-                columns_stats: columnsStats,
+                summary_text: JSON.stringify(diagnostics.summary_stats),
                 config
             });
             setAnalysis(data.interpretation);

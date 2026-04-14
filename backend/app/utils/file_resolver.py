@@ -9,12 +9,19 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+_THIS_FILE = Path(__file__).resolve()
+_BACKEND_ROOT = _THIS_FILE.parents[2]  # backend/
+
 DATA_DIR = Path("data")
 UPLOAD_DIR = DATA_DIR / "uploads"
 BACKEND_DATA_DIR = Path("backend/data")
 BACKEND_UPLOAD_DIR = BACKEND_DATA_DIR / "uploads"
+ABS_UPLOAD_DIR = _BACKEND_ROOT / "data" / "uploads"
+ABS_DATA_DIR = _BACKEND_ROOT / "data"
 
 SEARCH_PATHS = [
+    ABS_UPLOAD_DIR,
+    ABS_DATA_DIR,
     DATA_DIR,
     UPLOAD_DIR,
     BACKEND_DATA_DIR,
