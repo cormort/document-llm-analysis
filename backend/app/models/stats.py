@@ -6,6 +6,42 @@ from app.models.llm import LLMConfig
 from pydantic import BaseModel, Field
 
 
+class ColumnFilter(BaseModel):
+    column: str
+    values: list[Any]
+
+
+class FilterRequest(BaseModel):
+    file_path: str
+    filters: list[ColumnFilter] = []
+    config: LLMConfig = Field(default_factory=LLMConfig)
+
+
+class FilterResponse(BaseModel):
+    filtered_data: list[dict[str, Any]]
+    total_rows: int
+    applied_filters: list[str] = []
+
+
+class ReportItem(BaseModel):
+    group_value: str
+    summary: str
+    data: dict[str, Any]
+
+
+class BatchReportRequest(BaseModel):
+    file_path: str
+    slice_column: str
+    analysis_types: list[str] = Field(default_factory=list)
+    filters: list[ColumnFilter] = []
+    config: LLMConfig = Field(default_factory=LLMConfig)
+
+
+class BatchReportResponse(BaseModel):
+    reports: list[ReportItem]
+    total_groups: int
+
+
 class DiagnosticRequest(BaseModel):
     file_path: str
     config: LLMConfig = Field(default_factory=LLMConfig)

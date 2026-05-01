@@ -362,3 +362,318 @@ def run_kmeans(df: pd.DataFrame, features: list[str], n_clusters: int = 3) -> di
         "features_used": features
     }
 
+
+def apply_filters(df: pd.DataFrame, filters: list[dict]) -> pd.DataFrame:
+    """
+    Apply multiple column filters to a DataFrame.
+
+    Args:
+        df: DataFrame to filter
+        filters: List of filter dicts with 'column' and 'values' keys
+
+    Returns:
+        Filtered DataFrame
+    """
+    result = df.copy()
+    applied = []
+
+    for f in filters:
+        col = f.get("column")
+        vals = f.get("values", [])
+        if col and vals and col in result.columns:
+            result = result[result[col].isin(vals)]
+            applied.append(f"{col}: {', '.join(map(str, vals[:3]))}{'...' if len(vals) > 3 else ''}")
+
+    return result, applied
+
+
+def run_isolation_forest(
+    df: pd.DataFrame, features: list[str], contamination: float = 0.05
+) -> dict[str, Any]:
+    """
+    Execute Isolation Forest for anomaly detection.
+
+    Args:
+        df: DataFrame with data
+        features: List of feature column names
+        contamination: Expected proportion of outliers (default 0.05 = 5%)
+
+    Returns:
+        Dictionary containing anomaly labels and scores
+    """
+    from sklearn.ensemble import IsolationForest
+
+    data = df[features].dropna()
+
+    if len(data) < 10:
+        return {"error": "Insufficient data for Isolation Forest"}
+
+    if len(features) < 1:
+        return {"error": "Need at least 1 feature"}
+
+    iso = IsolationForest(contamination=contamination, random_state=42)
+    labels = iso.fit_predict(data)
+    scores = iso.decision_function(data)
+
+    anomaly_indices = []
+    anomaly_scores = []
+    for i, label in enumerate(labels):
+        if label == -1:
+            idx = data.index[i]
+            anomaly_indices.append(int(idx))
+            anomaly_scores.append(float(scores[i]))
+
+    n_anomalies = sum(labels == -1)
+
+    return {
+        "success": True,
+        "n_anomalies": int(n_anomalies),
+        "anomaly_percentage": float(n_anomalies / len(data) * 100),
+        "anomaly_indices": anomaly_indices,
+        "anomaly_scores": anomaly_scores,
+        "features_used": features,
+        "contamination": contamination
+    }
+
+
+def run_linear_regression(
+    df: pd.DataFrame, target: str, features: list[str]
+) -> dict[str, Any]:
+    """
+    Execute Linear Regression for prediction.
+
+    Args:
+        df: DataFrame with data
+        target: Target column name (Y)
+        features: List of feature column names (X)
+
+    Returns:
+        Dictionary containing model coefficients and metrics
+    """
+    from sklearn.linear_model import LinearRegression
+
+    if not features or not target:
+        return {"error": "Missing target or features"}
+
+    if target not in df.columns:
+        return {"error": f"Target column '{target}' not found"}
+
+    data = df[features + [target]].dropna()
+
+    if len(data) < len(features) + 2:
+        return {"error": "Insufficient data for regression"}
+
+    X = data[features]
+    y = data[target]
+
+    model = LinearRegression()
+    model.fit(X, y)
+
+    r_squared = model.score(X, y)
+
+    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_)}
+    coefficients["intercept"] = float(model.intercept_)
+
+    y_pred = model.predict(X)
+    residuals = y - y_pred
+    rmse = float(np.sqrt(np.mean(residuals ** 2)))
+    mae = float(np.mean(np.abs(residuals)))
+
+    return {
+        "success": True,
+        "r_squared": float(r_squared),
+        "coefficients": coefficients,
+        "rmse": rmse,
+        "mae": mae,
+        "n_samples": len(data),
+        "features_used": features,
+        "target": target
+    }
+
+
+def run_logistic_regression(
+    df: pd.DataFrame, target: str, features: list[str]
+) -> dict[str, Any]:
+    """
+    Execute Logistic Regression for classification.
+
+    Args:
+        df: DataFrame with data
+        target: Target column name (binary classification)
+        features: List of feature column names (X)
+
+    Returns:
+        Dictionary containing model coefficients and accuracy
+    """
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import LabelEncoder
+
+    if not features or not target:
+        return {"error": "Missing target or features"}
+
+    if target not in df.columns:
+        return {"error": f"Target column '{target}' not found"}
+
+    data = df[features + [target]].dropna()
+
+    if len(data) < len(features) + 2:
+        return {"error": "Insufficient data for regression"}
+
+    le = LabelEncoder()
+    y = le.fit_transform(data[target])
+
+    if len(set(y)) != 2:
+        return {"error": "Target must be binary (2 classes)"}
+
+    X = data[features]
+
+    model = LogisticRegression(max_iter=1000, random_state=42)
+    model.fit(X, y)
+
+    y_pred = model.predict(X)
+    accuracy = float(np.mean(y_pred == y))
+
+    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_[0])}
+    coefficients["intercept"] = float(model.intercept_[0])
+
+    return {
+        "success": True,
+        "accuracy": accuracy,
+        "coefficients": coefficients,
+        "n_samples": len(data),
+        "features_used": features,
+        "target": target,
+        "classes": le.classes_.tolist()
+    }
+
+
+def run_prophet_forecast(
+    df: pd.DataFrame, date_col: str, value_col: str, periods: int = 6
+) -> dict[str, Any]:
+    """
+    Execute Prophet time series forecasting.
+
+    Args:
+        df: DataFrame with time series data
+        date_col: Date/time column name
+        value_col: Value column name to forecast
+        periods: Number of periods to forecast
+
+    Returns:
+        Dictionary containing forecast results
+    """
+    try:
+        from prophet import Prophet
+    except ImportError:
+        return {"error": "Prophet not installed. Run: pip install prophet"}
+
+    prophet_df = df[[date_col, value_col]].dropna().copy()
+    prophet_df.columns = ["ds", "y"]
+
+    if not pd.api.types.is_datetime64_any_dtype(prophet_df["ds"]):
+        try:
+            prophet_df["ds"] = pd.to_datetime(prophet_df["ds"], errors="coerce")
+            prophet_df = prophet_df.dropna()
+        except Exception:
+            return {"error": "Cannot convert date column to datetime"}
+
+    if len(prophet_df) < 2:
+        return {"error": "Insufficient data for forecasting"}
+
+    model = Prophet(
+        yearly_seasonality="auto",
+        weekly_seasonality=False,
+        daily_seasonality=False
+    )
+    model.fit(prophet_df)
+
+    future = model.make_future_dataframe(periods=periods, freq="M")
+    forecast = model.predict(future)
+
+    historical = prophet_df[["ds", "y"]].to_dict(orient="records")
+    predictions = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(periods).to_dict(orient="records")
+
+    return {
+        "success": True,
+        "historical": historical,
+        "forecast": predictions,
+        "periods": periods,
+        "date_column": date_col,
+        "value_column": value_col
+    }
+
+
+def run_batch_report(
+    df: pd.DataFrame, slice_column: str, analysis_types: list[str], filters: list[dict] = None
+) -> list[dict[str, Any]]:
+    """
+    Generate batch reports for each group in a slice column.
+
+    Args:
+        df: DataFrame with data
+        slice_column: Column to group by
+        analysis_types: List of analysis types to run
+        filters: Optional filters to apply
+
+    Returns:
+        List of report dictionaries, one per group
+    """
+    reports = []
+
+    # Apply global filters if provided
+    if filters:
+        df, _ = apply_filters(df, filters)
+
+    if slice_column not in df.columns:
+        return [{"error": f"Column '{slice_column}' not found"}]
+
+    groups = df[slice_column].unique()
+
+    for group_val in groups:
+        group_df = df[df[slice_column] == group_val]
+        report = {
+            "group_value": str(group_val),
+            "n_rows": int(len(group_df)),
+            "analyses": {}
+        }
+
+        for atype in analysis_types:
+            if atype == "diagnostic":
+                num_cols = group_df.select_dtypes(include=[np.number]).columns
+                if len(num_cols) > 0:
+                    report["analyses"]["diagnostic"] = {
+                        "n_numeric": len(num_cols),
+                        "mean_values": group_df[num_cols].mean().to_dict()
+                    }
+
+            elif atype == "correlation":
+                num_df = group_df.select_dtypes(include=[np.number])
+                if num_df.shape[1] >= 2:
+                    corr = num_df.corr().replace({np.nan: None}).to_dict()
+                    report["analyses"]["correlation"] = corr
+
+            elif atype == "groupby":
+                # Find a numeric column to aggregate
+                num_cols = group_df.select_dtypes(include=[np.number]).columns.tolist()
+                if num_cols:
+                    target_col = num_cols[0]
+                    summary = group_df[target_col].describe().to_dict()
+                    report["analyses"]["groupby"] = {
+                        "target": target_col,
+                        "summary": summary
+                    }
+
+            elif atype == "outliers":
+                num_cols = group_df.select_dtypes(include=[np.number]).columns
+                if len(num_cols) > 0:
+                    outlier_counts = {}
+                    for col in num_cols[:5]:  # Limit to first 5 numeric cols
+                        outlier_res = detect_outliers_iqr(group_df[col])
+                        if "n_outliers" in outlier_res:
+                            outlier_counts[col] = outlier_res["n_outliers"]
+                    report["analyses"]["outliers"] = outlier_counts
+
+        reports.append(report)
+
+    return reports
+

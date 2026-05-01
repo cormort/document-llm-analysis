@@ -7,9 +7,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from sklearn.preprocessing import LabelEncoder
 
 from app.models.stats import (
+    BatchReportRequest,
+    BatchReportResponse,
+    ColumnFilter,
     DataPrepResponse,
     DataQualityItem,
     DatasetAnalysisRequest,
@@ -23,14 +27,18 @@ from app.models.stats import (
     FeatureSuggestionsResponse,
     FieldAnalysisRequest,
     FieldAnalysisResponse,
+    FilterRequest,
+    FilterResponse,
     GetDataRequest,
     ImputeRequest,
     InterpretStatsRequest,
     InterpretStatsResponse,
     MultivariateRequest,
     MultivariateResponse,
+    LLMConfig,
     NLToSQLRequest,
     NLToSQLResponse,
+    ReportItem,
     SQLQueryRequest,
     SQLQueryResponse,
     StatTestRequest,
@@ -48,12 +56,18 @@ from app.services.ai_interpreter import (
 from app.services.duckdb_service import duckdb_service
 from app.services.llm_service import llm_service
 from app.services.statistical_tests import (
+    apply_filters,
     detect_outliers_iqr,
     run_anova,
+    run_batch_report,
     run_chi_square,
     run_correlation_matrix,
+    run_isolation_forest,
     run_kruskal,
+    run_linear_regression,
+    run_logistic_regression,
     run_mannwhitneyu,
+    run_prophet_forecast,
     run_shapiro_wilk,
     run_ttest,
     run_wilcoxon,
@@ -693,10 +707,10 @@ async def execute_sql_query(request: SQLQueryRequest) -> SQLQueryResponse:
 
 @router.post("/nl-to-sql", response_model=NLToSQLResponse)
 async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
-    """Convert natural language question to SQL, execute, and interpret results.
+    """Convert natural language question to SQL and execute via DuckDB.
 
-    Uses LLM to generate SQL from natural language, executes via DuckDB,
-    and provides AI interpretation of results.
+    Uses LLM to generate SQL from natural language and executes it.
+    Interpretation is NOT included — call /nl-to-sql/interpret separately.
     """
     file_path = _resolve_file_path(request.file_path)
 
@@ -705,6 +719,7 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
             sql="", success=False, error=f"檔案未找到: {request.file_path}"
         )
 
+    sql = ""
     try:
         # Load file and get schema
         table_name = duckdb_service.load_file(str(file_path))
@@ -742,40 +757,58 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
         result_df = duckdb_service.execute_sql(sql)
         data = convert_numpy_types(result_df.head(100).to_dict(orient="records"))
 
-        # Generate interpretation
-        interp_prompt = f"""請根據以下查詢結果回答原始問題，並提供簡短的觀察洞察。
-
-原始問題: {request.question}
-查詢 SQL: {sql}
-結果摘要: 共 {len(result_df)} 筆資料
-結果樣例: {result_df.head(5).to_markdown()}
-
-請用繁體中文回覆，簡潔專業。
-"""
-
-        interpretation = await llm_service.analyze_text(
-            text_content="",
-            user_instruction=interp_prompt,
-            provider=request.config.provider,
-            model_name=request.config.model_name,
-            local_url=request.config.local_url,
-            api_key=api_key,
-        )
-
         return NLToSQLResponse(
             sql=sql,
             success=True,
             data=data,
-            summary=f"成功執行查詢，共 {len(result_df)} 筆結果",
-            interpretation=interpretation,
+            summary=f"共 {len(result_df)} 筆結果",
         )
 
     except Exception as e:
         return NLToSQLResponse(
-            sql=sql if "sql" in locals() else "",
+            sql=sql,
             success=False,
             error=f"執行錯誤: {str(e)}",
         )
+
+
+class NLToSQLInterpretRequest(BaseModel):
+    """Request for on-demand result interpretation."""
+    question: str
+    sql: str
+    data_sample: list[dict[str, Any]]
+    total_rows: int
+    config: LLMConfig = Field(default_factory=LLMConfig)
+
+
+@router.post("/nl-to-sql/interpret")
+async def interpret_nl_sql_result(request: NLToSQLInterpretRequest) -> dict:
+    """Interpret NL-to-SQL query results on demand."""
+    config = request.config
+
+    df_sample = pd.DataFrame(request.data_sample)
+
+    interp_prompt = f"""請根據以下查詢結果回答原始問題，並提供簡短的觀察洞察。
+
+原始問題: {request.question}
+查詢 SQL: {request.sql}
+結果摘要: 共 {request.total_rows} 筆資料
+結果樣例:
+{df_sample.to_markdown(index=False)}
+
+請用繁體中文回覆，簡潔專業。
+"""
+
+    interpretation = await llm_service.analyze_text(
+        text_content="",
+        user_instruction=interp_prompt,
+        provider=config.provider,
+        model_name=config.model_name,
+        local_url=config.local_url,
+        api_key=config.api_key,
+    )
+
+    return {"interpretation": interpretation}
 
 
 @router.get("/sql-schema")
@@ -801,3 +834,164 @@ async def get_sql_schema(file_path: str) -> dict:
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/filter", response_model=FilterResponse)
+async def apply_column_filter(request: FilterRequest) -> FilterResponse:
+    """Apply column filters to data and return filtered results."""
+    df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    filters = [{"column": f.column, "values": f.values} for f in request.filters]
+    filtered_df, applied = apply_filters(df, filters)
+
+    data = convert_numpy_types(filtered_df.head(200).to_dict(orient="records"))
+
+    return FilterResponse(
+        filtered_data=data,
+        total_rows=len(filtered_df),
+        applied_filters=applied
+    )
+
+
+@router.post("/batch-report", response_model=BatchReportResponse)
+async def generate_batch_report(request: BatchReportRequest) -> BatchReportResponse:
+    """Generate batch reports for each group in a slice column."""
+    df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    filters = [{"column": f.column, "values": f.values} for f in request.filters]
+    analysis_types = request.analysis_types or ["diagnostic", "correlation", "groupby", "outliers"]
+
+    reports = run_batch_report(df, request.slice_column, analysis_types, filters)
+
+    report_items = [
+        ReportItem(
+            group_value=r.get("group_value", ""),
+            summary=f"共 {r.get('n_rows', 0)} 筆資料",
+            data=r
+        )
+        for r in reports
+    ]
+
+    return BatchReportResponse(
+        reports=report_items,
+        total_groups=len(report_items)
+    )
+
+
+@router.post("/test/isolation-forest")
+async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
+    """Run Isolation Forest anomaly detection."""
+    df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    if not request.features:
+        raise HTTPException(status_code=400, detail="No features provided")
+
+    contamination = request.params.get("contamination", 0.05) if request.params else 0.05
+
+    result = run_isolation_forest(df, request.features, contamination)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return convert_numpy_types(result)
+
+
+@router.post("/model/linear")
+async def run_linear_regression_model(request: MultivariateRequest) -> dict:
+    """Run Linear Regression for prediction."""
+    df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    if not request.features:
+        raise HTTPException(status_code=400, detail="No features provided")
+
+    target = request.params.get("target") if request.params else None
+    if not target:
+        raise HTTPException(status_code=400, detail="Target column not specified in params")
+
+    # Use first numeric column as target if not specified
+    if target not in df.columns:
+        num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        if num_cols:
+            target = num_cols[0]
+        else:
+            raise HTTPException(status_code=400, detail="No numeric target column found")
+
+    result = run_linear_regression(df, target, request.features)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return convert_numpy_types(result)
+
+
+@router.post("/model/logistic")
+async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
+    """Run Logistic Regression for binary classification."""
+    df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    if not request.features:
+        raise HTTPException(status_code=400, detail="No features provided")
+
+    target = request.params.get("target") if request.params else None
+    if not target:
+        raise HTTPException(status_code=400, detail="Target column not specified in params")
+
+    if target not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Target column '{target}' not found")
+
+    # Check if binary
+    unique_vals = df[target].dropna().unique()
+    if len(unique_vals) != 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Target must be binary (2 classes), found {len(unique_vals)} classes"
+        )
+
+    result = run_logistic_regression(df, target, request.features)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return convert_numpy_types(result)
+
+
+@router.post("/forecast/prophet")
+async def run_prophet_forecast(request: DiagnosticRequest) -> dict:
+    """Run Prophet time series forecasting."""
+    df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    # Find date and numeric columns
+    date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]
+    if not date_cols:
+        # Try to find date-like columns
+        date_cols = [c for c in df.columns if any(kw in c.lower() for kw in ["date", "日期", "年", "time", "月"])]
+
+    if not date_cols:
+        raise HTTPException(status_code=400, detail="No date column found")
+
+    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if not num_cols:
+        raise HTTPException(status_code=400, detail="No numeric column found")
+
+    date_col = date_cols[0]
+    value_col = num_cols[0]
+    periods = 6
+
+    result = run_prophet_forecast(df, date_col, value_col, periods)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return convert_numpy_types(result)
