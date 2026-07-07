@@ -4,14 +4,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.models.llm import LLMConfig
+from app.models.stats import ColumnFilter
 
-class LLMConfig(BaseModel):
-    """LLM Configuration for AI interpretation."""
-
-    provider: str = "gemini"
-    model_name: str = "gemini-2.0-flash-exp"
-    local_url: str | None = None
-    api_key: str | None = None
+__all__ = ["LLMConfig"]
 
 
 class RegressionRequest(BaseModel):
@@ -21,6 +17,7 @@ class RegressionRequest(BaseModel):
     feature_cols: list[str]
     target_col: str
     test_size: float = 0.2
+    filters: list[ColumnFilter] = []
     config: LLMConfig | None = None
 
 
@@ -44,6 +41,7 @@ class TimeSeriesRequest(BaseModel):
     date_col: str
     value_col: str
     forecast_periods: int = 12
+    filters: list[ColumnFilter] = []
     config: LLMConfig | None = None
 
 
@@ -67,6 +65,7 @@ class ClassificationRequest(BaseModel):
     feature_cols: list[str]
     target_col: str
     test_size: float = 0.2
+    filters: list[ColumnFilter] = []
     config: LLMConfig | None = None
 
 

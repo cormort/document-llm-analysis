@@ -19,24 +19,27 @@ from app.services.modeling_core import (
     train_linear_regression,
     train_logistic_regression,
 )
+from app.services.statistical_tests import apply_filters
 from app.utils.file_resolver import convert_numpy_types, load_dataframe
 
 router = APIRouter()
 DATA_DIR = Path("data")
 
 
-def get_df(file_path_str: str) -> pd.DataFrame:
-    """Helper to load dataframe from path."""
-    df = load_dataframe(file_path_str)
+def get_df(request) -> pd.DataFrame:
+    """Helper to load dataframe and apply global slice filters."""
+    df = load_dataframe(request.file_path)
     if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {file_path_str}")
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+    if request.filters:
+        df, _ = apply_filters(df, [f.model_dump() for f in request.filters])
     return df
 
 
 @router.post("/regression", response_model=RegressionResponse)
 async def perform_regression(request: RegressionRequest) -> RegressionResponse:
     """Train a Linear Regression model and return metrics + predictions."""
-    df = get_df(request.file_path)
+    df = get_df(request)
 
     # Validate columns
     missing_cols = [c for c in request.feature_cols if c not in df.columns]
@@ -67,7 +70,7 @@ async def perform_classification(
     request: ClassificationRequest,
 ) -> ClassificationResponse:
     """Train a Logistic Regression model for classification."""
-    df = get_df(request.file_path)
+    df = get_df(request)
 
     # Validate columns
     missing_cols = [c for c in request.feature_cols if c not in df.columns]
@@ -96,7 +99,7 @@ async def perform_classification(
 @router.post("/timeseries", response_model=TimeSeriesResponse)
 async def perform_timeseries(request: TimeSeriesRequest) -> TimeSeriesResponse:
     """Decompose time series and generate simple forecast."""
-    df = get_df(request.file_path)
+    df = get_df(request)
 
     # Validate columns
     if request.date_col not in df.columns:

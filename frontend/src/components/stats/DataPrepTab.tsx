@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { imputeMissing, encodeVariable, transformVariable, DiagnosticResponse, DataQualityItem } from "@/lib/api";
-import { 
-    Sparkles, 
-    Eraser, 
-    Binary, 
+import { imputeMissing, encodeVariable, transformVariable, meltData, MeltResponse, DiagnosticResponse, DataQualityItem } from "@/lib/api";
+import {
+    Sparkles,
+    Eraser,
+    Binary,
     Calculator,
-    CheckCircle2
+    CheckCircle2,
+    FlipVertical2,
+    Download
 } from "lucide-react";
 
 interface DataPrepTabProps {
@@ -30,6 +32,11 @@ export function DataPrepTab({ selectedDoc, filePath, diagnostics }: DataPrepTabP
 
     // Synthesis
     const [synthConfig, setSynthConfig] = useState({ name: "", expression: "" });
+
+    // Melt (wide to long)
+    const [meltIdVars, setMeltIdVars] = useState<string[]>([]);
+    const [meltValueVars, setMeltValueVars] = useState<string[]>([]);
+    const [meltResult, setMeltResult] = useState<MeltResponse | null>(null);
 
     const handleImpute = async () => {
         if (!filePath || !imputeConfig.col) return;
@@ -85,6 +92,47 @@ export function DataPrepTab({ selectedDoc, filePath, diagnostics }: DataPrepTabP
         } finally {
             setProcessing(false);
         }
+    };
+
+    const handleMelt = async () => {
+        if (!filePath || meltIdVars.length === 0) return;
+        setProcessing(true);
+        try {
+            const res = await meltData({
+                file_path: filePath,
+                id_vars: meltIdVars,
+                value_vars: meltValueVars,
+            });
+            setMeltResult(res);
+            setResultMsg(`Melt 完成：共 ${res.total_rows} 列（預覽前 ${res.data.length} 列）`);
+        } catch (err: unknown) {
+            console.error(err);
+            setResultMsg("Error: " + (err instanceof Error ? err.message : String(err)));
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const downloadMeltCsv = () => {
+        if (!meltResult || meltResult.data.length === 0) return;
+        const headers = Object.keys(meltResult.data[0]);
+        const csv = [
+            headers.join(","),
+            ...meltResult.data.map(row =>
+                headers.map(h => {
+                    const v = row[h];
+                    const s = v === null ? "" : String(v);
+                    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+                }).join(",")
+            ),
+        ].join("\n");
+        const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "melted_data.csv";
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     if (!selectedDoc) {
@@ -224,6 +272,88 @@ export function DataPrepTab({ selectedDoc, filePath, diagnostics }: DataPrepTabP
                     </div>
                 </Card>
             </div>
+
+            {/* 4. Melt (Wide to Long) */}
+            <Card className="p-6 border-t-4 border-t-teal-400">
+                <h3 className="font-bold mb-2 flex items-center gap-2 text-slate-700">
+                    <FlipVertical2 className="text-teal-500 w-5 h-5"/> 資料重塑：寬轉長 (Melt)
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">將多個數值欄位融合為「變數/數值」兩欄的長表格式，適合後續分組與趨勢分析</p>
+                <div className="space-y-3">
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">識別欄位 (ID Vars，保留不動)</label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {(diagnostics?.quality_report ?? []).map(c => (
+                                <button
+                                    key={c.column}
+                                    onClick={() => setMeltIdVars(v => v.includes(c.column) ? v.filter(x => x !== c.column) : [...v, c.column])}
+                                    className={`px-2 py-0.5 rounded-md text-xs border transition-all ${
+                                        meltIdVars.includes(c.column)
+                                            ? "bg-teal-100 text-teal-700 border-teal-300 font-bold"
+                                            : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                                    }`}
+                                >
+                                    {c.column}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">值欄位 (Value Vars，選填 = 其餘全部)</label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {(diagnostics?.quality_report ?? []).filter(c => !meltIdVars.includes(c.column)).map(c => (
+                                <button
+                                    key={c.column}
+                                    onClick={() => setMeltValueVars(v => v.includes(c.column) ? v.filter(x => x !== c.column) : [...v, c.column])}
+                                    className={`px-2 py-0.5 rounded-md text-xs border transition-all ${
+                                        meltValueVars.includes(c.column)
+                                            ? "bg-teal-100 text-teal-700 border-teal-300 font-bold"
+                                            : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                                    }`}
+                                >
+                                    {c.column}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            onClick={handleMelt}
+                            disabled={processing || meltIdVars.length === 0}
+                            className="bg-teal-500 hover:bg-teal-600 text-white"
+                        >
+                            執行寬轉長 (Melt)
+                        </Button>
+                        {meltResult && meltResult.data.length > 0 && (
+                            <Button onClick={downloadMeltCsv} variant="secondary" className="gap-2">
+                                <Download size={14}/> 下載 CSV
+                            </Button>
+                        )}
+                    </div>
+                    {meltResult && meltResult.data.length > 0 && (
+                        <div className="overflow-x-auto max-h-64 overflow-y-auto border rounded">
+                            <table className="w-full text-xs">
+                                <thead className="sticky top-0">
+                                    <tr className="border-b bg-slate-50">
+                                        {Object.keys(meltResult.data[0]).map(k => (
+                                            <th key={k} className="p-2 text-left whitespace-nowrap">{k}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {meltResult.data.slice(0, 100).map((row, idx) => (
+                                        <tr key={idx} className="border-b hover:bg-slate-50">
+                                            {Object.values(row).map((v, i) => (
+                                                <td key={i} className="p-2 whitespace-nowrap">{v === null ? "-" : String(v)}</td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </Card>
 
             {/* Results Log */}
             {resultMsg && (

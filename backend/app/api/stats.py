@@ -33,6 +33,8 @@ from app.models.stats import (
     ImputeRequest,
     InterpretStatsRequest,
     InterpretStatsResponse,
+    MeltRequest,
+    MeltResponse,
     MultivariateRequest,
     MultivariateResponse,
     LLMConfig,
@@ -84,10 +86,19 @@ from app.utils.file_resolver import (
 router = APIRouter()
 
 
+
+def _load_sliced(request) -> "pd.DataFrame":
+    """Load dataframe and apply the request's global slice filters, if any."""
+    df = load_dataframe(request.file_path)
+    filters = getattr(request, "filters", None)
+    if filters:
+        df, _ = apply_filters(df, [f.model_dump() for f in filters])
+    return df
+
 @router.post("/diagnostic", response_model=DiagnosticResponse)
 async def get_diagnostic(request: DiagnosticRequest) -> DiagnosticResponse:
     """Get data quality profiling and summary stats."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -121,7 +132,7 @@ async def get_diagnostic(request: DiagnosticRequest) -> DiagnosticResponse:
 @router.post("/descriptive")
 async def get_descriptive_stats(request: DiagnosticRequest) -> dict:
     """Get detailed descriptive statistics for numeric columns."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     # Get numeric columns only
     numeric_df = df.select_dtypes(include=[np.number])
@@ -164,7 +175,7 @@ async def get_descriptive_stats(request: DiagnosticRequest) -> dict:
 @router.post("/eda", response_model=EDAResponse)
 async def perform_eda(request: EDARequest) -> EDAResponse:
     """Perform Exploratory Data Analysis (correlation, groupby, etc.)."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     result_data = None
     interpretation = None
@@ -216,13 +227,42 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    elif request.analysis_type == "pivot":
+        index_cols = request.params.get("index") or []
+        column_cols = request.params.get("columns") or []
+        value_cols = request.params.get("values") or []
+        agg_func = request.params.get("agg", "mean")
+
+        if not index_cols or not value_cols:
+            raise HTTPException(status_code=400, detail="請至少選擇列 (Index) 與值 (Values)")
+
+        try:
+            pv = pd.pivot_table(
+                df,
+                values=value_cols,
+                index=index_cols,
+                columns=column_cols or None,
+                aggfunc=agg_func,
+            )
+            # Flatten MultiIndex columns for JSON serialization
+            pv.columns = [
+                " / ".join(str(x) for x in col) if isinstance(col, tuple) else str(col)
+                for col in pv.columns
+            ]
+            pv = pv.reset_index()
+            result_data = convert_numpy_types(
+                pv.replace({np.nan: None}).to_dict(orient="records")
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"透視表錯誤: {str(e)}")
+
     return EDAResponse(result_data=result_data, interpretation=interpretation)
 
 
 @router.post("/test", response_model=StatTestResponse)
 async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
     """Run statistical tests (T-test, ANOVA, Shapiro)."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     test_results = {}
     interpretation = None
@@ -288,7 +328,7 @@ async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
 @router.post("/multivariate", response_model=MultivariateResponse)
 async def perform_multivariate(request: MultivariateRequest) -> MultivariateResponse:
     """Run multivariate analysis (PCA or K-Means)."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
@@ -836,6 +876,35 @@ async def get_sql_schema(file_path: str) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/melt", response_model=MeltResponse)
+async def melt_data(request: MeltRequest) -> MeltResponse:
+    """Reshape data from wide to long format (pd.melt)."""
+    df = _load_sliced(request)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
+
+    missing = [c for c in request.id_vars + request.value_vars if c not in df.columns]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"欄位不存在: {missing}")
+
+    try:
+        melted = pd.melt(
+            df,
+            id_vars=request.id_vars,
+            value_vars=request.value_vars or None,
+            var_name="變數",
+            value_name="數值",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Melt 錯誤: {str(e)}")
+
+    # ponytail: cap at 5000 rows for the response; full export can stream later if needed
+    data = convert_numpy_types(
+        melted.head(5000).replace({np.nan: None}).to_dict(orient="records")
+    )
+    return MeltResponse(data=data, total_rows=len(melted))
+
+
 @router.post("/filter", response_model=FilterResponse)
 async def apply_column_filter(request: FilterRequest) -> FilterResponse:
     """Apply column filters to data and return filtered results."""
@@ -885,7 +954,7 @@ async def generate_batch_report(request: BatchReportRequest) -> BatchReportRespo
 @router.post("/test/isolation-forest")
 async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
     """Run Isolation Forest anomaly detection."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -905,7 +974,7 @@ async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
 @router.post("/model/linear")
 async def run_linear_regression_model(request: MultivariateRequest) -> dict:
     """Run Linear Regression for prediction."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -935,7 +1004,7 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
 @router.post("/model/logistic")
 async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
     """Run Logistic Regression for binary classification."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -968,7 +1037,7 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
 @router.post("/forecast/prophet")
 async def run_prophet_forecast(request: DiagnosticRequest) -> dict:
     """Run Prophet time series forecasting."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 

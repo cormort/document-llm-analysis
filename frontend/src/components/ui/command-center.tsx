@@ -11,7 +11,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { generatePandasQuery, executeQuery, interpretQuery, QueryExecuteResponse } from "@/lib/api";
+import { nlToSQL, nlToSQLInterpret, NLToSQLResponse } from "@/lib/api";
 import { useSettingsStore } from "@/stores/settings-store";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { 
@@ -36,7 +36,7 @@ export function CommandCenter({ filePath, className }: CommandCenterProps) {
     const [question, setQuestion] = useState("");
     const [processing, setProcessing] = useState(false);
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-    const [queryResult, setQueryResult] = useState<QueryExecuteResponse | null>(null);
+    const [queryResult, setQueryResult] = useState<NLToSQLResponse | null>(null);
     const [interpretation, setInterpretation] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,26 +59,24 @@ export function CommandCenter({ filePath, className }: CommandCenterProps) {
         };
 
         try {
-            // 1. Generate code
-            const { pandas_code } = await generatePandasQuery(filePath, question, config);
-            setGeneratedCode(pandas_code);
-
-            // 2. Execute code
-            const res = await executeQuery({
-                file_path: filePath,
-                pandas_code
-            });
+            // NL → SQL → DuckDB（取代舊的 pandas exec 流程）
+            const res = await nlToSQL(filePath, question, config);
+            setGeneratedCode(res.sql);
             setQueryResult(res);
 
-            // 3. Interpret if successful
             if (res.success && res.data) {
-                const { interpretation: intro } = await interpretQuery(
-                    question,
-                    res.summary || "",
-                    res.data.slice(0, 5),
-                    config
-                );
-                setInterpretation(intro);
+                if (res.interpretation) {
+                    setInterpretation(res.interpretation);
+                } else {
+                    const { interpretation: intro } = await nlToSQLInterpret(
+                        question,
+                        res.sql,
+                        res.data.slice(0, 5),
+                        res.data.length,
+                        config
+                    );
+                    setInterpretation(intro);
+                }
             }
         } catch (err) {
             console.error("Query failed", err);
@@ -170,7 +168,7 @@ export function CommandCenter({ filePath, className }: CommandCenterProps) {
                         {generatedCode && (
                             <div className="p-4 bg-slate-900/95 rounded-xl border border-slate-800 shadow-inner group relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Badge variant="secondary" className="bg-slate-800 text-white border-slate-700">Python</Badge>
+                                    <Badge variant="secondary" className="bg-slate-800 text-white border-slate-700">SQL</Badge>
                                 </div>
                                 <div className="flex items-center gap-2 mb-3 text-slate-400">
                                     <Terminal size={14} />

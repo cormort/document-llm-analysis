@@ -47,34 +47,6 @@ class ChatRequest(BaseModel):
     config: LLMConfig = Field(default_factory=LLMConfig)
 
 
-class QueryRequest(BaseModel):
-    """Request for pandas query generation."""
-
-    question: str = Field(..., description="Natural language question")
-    columns_info: str = Field(..., description="DataFrame column information")
-    sample_data: str = Field(..., description="Sample data as markdown")
-    unit: str = Field(default="元", description="Currency unit")
-    config: LLMConfig = Field(default_factory=LLMConfig)
-
-
-class FileQueryRequest(BaseModel):
-    """Request for pandas query generation from file."""
-
-    file_path: str = Field(..., description="Path to file")
-    question: str = Field(..., description="Natural language question")
-    config: LLMConfig = Field(default_factory=LLMConfig)
-
-
-class QueryFixRequest(BaseModel):
-    """Request for fixing pandas query errors."""
-
-    original_code: str = Field(..., description="Original code that failed")
-    error_message: str = Field(..., description="Error message")
-    question: str = Field(..., description="Original question")
-    columns_info: str = Field(..., description="DataFrame column info")
-    config: LLMConfig = Field(default_factory=LLMConfig)
-
-
 class TokenEstimationRequest(BaseModel):
     """Request for token estimation before analysis."""
 

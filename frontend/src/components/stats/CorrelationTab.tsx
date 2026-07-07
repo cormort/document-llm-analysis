@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { EDAResponse } from "@/lib/api";
-import { Link, Play, Bot, ZoomIn } from "lucide-react";
+import { useAdviceStore } from "@/stores/advice-store";
+import { ExportInterpretation } from "./ExportInterpretation";
+import { Link, Play, Bot, ZoomIn, Send, Check } from "lucide-react";
+import { useState } from "react";
 
 interface CorrelationTabProps {
     selectedDoc: string | null;
@@ -24,6 +27,8 @@ export function CorrelationTab({
     onInterpret,
     isInterpreting
 }: CorrelationTabProps) {
+    const setRegressionAdvice = useAdviceStore(s => s.setRegressionAdvice);
+    const [adviceSent, setAdviceSent] = useState(false);
 
     if (!selectedDoc) {
         return (
@@ -69,6 +74,17 @@ export function CorrelationTab({
                                 <span className="p-1 bg-blue-700 rounded text-xs px-2">AI 深度洞察</span>
                             </h3>
                             <MarkdownRenderer content={edaResults.interpretation} />
+                            <div className="mt-4 flex items-center justify-between gap-2 flex-wrap">
+                                <Button
+                                    onClick={() => { setRegressionAdvice(edaResults.interpretation!); setAdviceSent(true); }}
+                                    variant="secondary"
+                                    size="sm"
+                                    className="gap-2 text-xs"
+                                >
+                                    {adviceSent ? <><Check size={14} className="text-emerald-600"/> 已傳送至建模分頁</> : <><Send size={14}/> 傳送建議變數至建模分頁</>}
+                                </Button>
+                                <ExportInterpretation content={edaResults.interpretation} title="相關性分析報告" />
+                            </div>
                         </Card>
                     )}
 

@@ -42,8 +42,21 @@ class BatchReportResponse(BaseModel):
     total_groups: int
 
 
+class MeltRequest(BaseModel):
+    file_path: str
+    id_vars: list[str]
+    value_vars: list[str] = []
+    filters: list[ColumnFilter] = []
+
+
+class MeltResponse(BaseModel):
+    data: list[dict[str, Any]]
+    total_rows: int
+
+
 class DiagnosticRequest(BaseModel):
     file_path: str
+    filters: list[ColumnFilter] = []
     config: LLMConfig = Field(default_factory=LLMConfig)
 
 class DataQualityItem(BaseModel):
@@ -63,6 +76,7 @@ class EDARequest(BaseModel):
     file_path: str
     analysis_type: str = Field(..., description="correlation, groupby, trend, pivot")
     params: dict[str, Any] = Field(default_factory=dict)
+    filters: list[ColumnFilter] = []
     config: LLMConfig = Field(default_factory=LLMConfig)
     skip_interpretation: bool = False
 
@@ -75,6 +89,7 @@ class StatTestRequest(BaseModel):
     test_type: str = Field(..., description="ttest, anova, shapiro, outliers, chi_square, mann_whitney, kruskal, wilcoxon")
     target_columns: list[str]
     group_column: str | None = None
+    filters: list[ColumnFilter] = []
     config: LLMConfig = Field(default_factory=LLMConfig)
 
 class StatTestResponse(BaseModel):
@@ -88,6 +103,7 @@ class MultivariateRequest(BaseModel):
     features: list[str] = Field(..., description="List of feature column names")
     n_components: int = Field(2, description="Number of components for PCA")
     n_clusters: int = Field(3, description="Number of clusters for KMeans")
+    filters: list[ColumnFilter] = []
     config: LLMConfig = Field(default_factory=LLMConfig)
 
 class MultivariateResponse(BaseModel):

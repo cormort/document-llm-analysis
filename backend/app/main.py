@@ -20,7 +20,6 @@ from app.api import (
     llm_queue,
     mcp_tools,
     modeling,
-    query,
     rag,
     reports,
     stats,
@@ -94,7 +93,6 @@ app.include_router(llm.router, prefix="/api/llm", tags=["LLM"])
 app.include_router(llm_queue.router, prefix="/api/llm/queue", tags=["LLM Queue"])
 app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-app.include_router(query.router, prefix="/api/query", tags=["Query"])
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch"])
 app.include_router(stats.router, prefix="/api/stats", tags=["Statistics"])
 app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])

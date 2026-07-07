@@ -503,47 +503,6 @@ class LLMService:
             **kwargs,
         )
 
-    async def generate_pandas_query(
-        self,
-        question: str,
-        df_info: dict,
-        provider=None,
-        model_name=None,
-        local_url=None,
-        **kwargs,
-    ):
-        if not provider:
-            config = self.get_routing_config("fast")
-            provider = config["provider"]
-            model_name = config["model_name"]
-            local_url = config.get("local_url")
-
-        system_prompt = """你是一位 Pandas 資料分析專家。請根據使用者的問題和資料資訊，生成正確的 Pandas 程式碼。
-輸出格式：
-1. 只輸出可執行的 Python 程式碼
-2. 不要包含解釋或註解
-3. 結果必須賦值給變數 `result`"""
-
-        user_prompt = f"""問題：{question}
-
-資料資訊：
-- 欄位：{df_info.get("columns", [])}
-- 資料筆數：{df_info.get("shape", ["未知"])[0]}
-- 欄位類型：{df_info.get("dtypes", {})}
-
-請生成 Pandas 程式碼："""
-
-        api_key = kwargs.pop("api_key", self.api_key)
-        return await self._call_provider(
-            provider,
-            model_name,
-            local_url,
-            api_key,
-            system_prompt,
-            user_prompt,
-            **kwargs,
-        )
-
     # ==========================================
     # RAG Integration
     # ==========================================

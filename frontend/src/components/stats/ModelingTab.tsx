@@ -8,7 +8,9 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     LineChart, Line, ScatterChart, Scatter
 } from "recharts";
-import { TrendingUp, Play, Settings, Target, Binary, Activity, Layers } from "lucide-react";
+import { TrendingUp, Play, Settings, Target, Binary, Activity, Layers, Lightbulb, X } from "lucide-react";
+import { useAdviceStore } from "@/stores/advice-store";
+import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import dynamic from "next/dynamic";
 import {
     performRegression,
@@ -40,6 +42,7 @@ export function ModelingTab({
 }: ModelingTabProps) {
 
     const [activeTab, setActiveTab] = useState("regression");
+    const { regressionAdvice, setRegressionAdvice } = useAdviceStore();
     const [processing, setProcessing] = useState(false);
     
     // Regression State
@@ -132,6 +135,23 @@ export function ModelingTab({
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+             {regressionAdvice && (
+                <Card className="p-5 bg-amber-50 border-amber-200 relative">
+                    <button
+                        onClick={() => setRegressionAdvice(null)}
+                        className="absolute top-3 right-3 text-amber-400 hover:text-amber-700"
+                        aria-label="關閉建議"
+                    >
+                        <X size={16} />
+                    </button>
+                    <h4 className="font-bold text-sm text-amber-800 flex items-center gap-2 mb-2">
+                        <Lightbulb size={16} /> 來自相關性分析的變數選擇建議
+                    </h4>
+                    <div className="text-xs text-amber-900 max-h-64 overflow-y-auto">
+                        <MarkdownRenderer content={regressionAdvice} />
+                    </div>
+                </Card>
+            )}
              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 mb-6">
                     <TabsTrigger value="regression" className="flex items-center gap-2">

@@ -7,6 +7,9 @@ import { ExploratoryTab } from "@/components/stats/ExploratoryTab";
 import { InferenceTab } from "@/components/stats/InferenceTab";
 import { MultivariateTab } from "@/components/stats/MultivariateTab";
 import { ModelingTab } from "@/components/stats/ModelingTab";
+import { GlobalSliceBar } from "@/components/stats/GlobalSliceBar";
+import { ChartsTab } from "@/components/stats/ChartsTab";
+import { BatchTab } from "@/components/stats/BatchTab";
 import { CommandCenter } from "@/components/ui/command-center";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -33,7 +36,9 @@ import {
     Network,
     Compass,
     Wrench,
-    LayoutGrid
+    LayoutGrid,
+    PieChart,
+    Package
 } from "lucide-react";
 
 import { useSettingsStore } from "@/stores/settings-store";
@@ -345,11 +350,19 @@ export default function StatisticsPage() {
                                         <TabsTrigger value="profiling" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><BarChart3 size={14} className="mr-2"/> 概況</TabsTrigger>
                                         <TabsTrigger value="dataprep" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><Wrench size={14} className="mr-2"/> 準備</TabsTrigger>
                                         <TabsTrigger value="exploratory" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><Compass size={14} className="mr-2"/> 探索</TabsTrigger>
-                                        <TabsTrigger value="inference" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><Microscope size={14} className="mr-2"/> 推論</TabsTrigger>
+                                        <TabsTrigger value="charts" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><PieChart size={14} className="mr-2"/> 圖表</TabsTrigger>
+                                        <TabsTrigger value="inference"className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><Microscope size={14} className="mr-2"/> 推論</TabsTrigger>
                                         <TabsTrigger value="multivariate" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><Network size={14} className="mr-2"/> 多變量</TabsTrigger>
                                         <TabsTrigger value="modeling" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><TrendingUp size={14} className="mr-2"/> 建模</TabsTrigger>
+                                        <TabsTrigger value="batch" className="rounded-full px-4 py-1.5 text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-900"><Package size={14} className="mr-2"/> 批次</TabsTrigger>
                                     </TabsList>
                                 </div>
+
+                                {/* 3. Global Data Slicing */}
+                                <GlobalSliceBar
+                                    filePath={currentFilePath}
+                                    diagnostics={diagnostics}
+                                />
                             </div>
                         </div>
 
@@ -385,7 +398,15 @@ export default function StatisticsPage() {
                                 />
                             </TabsContent>
 
-                            <TabsContent value="inference" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <TabsContent value="charts" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <ChartsTab
+                                    selectedDoc={selectedDoc}
+                                    config={config}
+                                    diagnostics={diagnostics}
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="inference"className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <InferenceTab 
                                     selectedDoc={selectedDoc}
                                     filePath={currentFilePath}
@@ -414,6 +435,14 @@ export default function StatisticsPage() {
                                     selectedDoc={selectedDoc}
                                     filePath={currentFilePath}
                                     config={config}
+                                    diagnostics={diagnostics}
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="batch" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <BatchTab
+                                    selectedDoc={selectedDoc}
+                                    filePath={currentFilePath}
                                     diagnostics={diagnostics}
                                 />
                             </TabsContent>

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
+import { ExportInterpretation } from "./ExportInterpretation";
 import { DiagnosticResponse, StatTestResponse, getColumnData } from "@/lib/api";
 import { Settings, Bot, Lightbulb, Telescope, BarChart3, Binary, Scale, AlertTriangle } from "lucide-react";
 
@@ -356,6 +357,9 @@ export function InferenceTab({
                                             </div>
                                             <div className="text-xs text-slate-600 leading-relaxed max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                                                 <MarkdownRenderer content={testResults.interpretation} />
+                                            </div>
+                                            <div className="mt-3">
+                                                <ExportInterpretation content={testResults.interpretation} title="統計檢定報告" />
                                             </div>
                                         </Card>
                                     )}

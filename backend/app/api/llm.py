@@ -14,10 +14,7 @@ from app.api.auth import get_current_user
 from app.models.llm import (
     AnalyzeFileRequest,
     AnalyzeRequest,
-    FileQueryRequest,
     LLMResponse,
-    QueryFixRequest,
-    QueryRequest,
     TokenEstimationRequest,
     TokenEstimationResponse,
 )
@@ -178,71 +175,6 @@ async def analyze_file_stream(request: AnalyzeFileRequest) -> EventSourceRespons
         return EventSourceResponse(stream_response(result))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/query", response_model=LLMResponse)
-async def generate_query(request: QueryRequest | FileQueryRequest) -> LLMResponse:
-    """Generate pandas query from natural language."""
-    try:
-        columns_info = ""
-        sample_data = ""
-
-        # Handle File Query
-        if isinstance(request, FileQueryRequest) or hasattr(request, "file_path"):
-            import pandas as pd
-
-            from app.utils.file_resolver import load_dataframe
-
-            df = load_dataframe(request.file_path)
-
-            if df is not None:
-                # Prepare Schema Info
-                buffer = io.StringIO()
-                df.info(buf=buffer)
-                columns_info = buffer.getvalue()
-
-                # Prepare Sample Data (Top 5 rows as markdown)
-                sample_data = df.head(5).to_markdown(index=False)
-        else:
-            # Handle standard QueryRequest
-            columns_info = request.columns_info
-            sample_data = request.sample_data
-
-        result = await llm_service.generate_pandas_query(
-            question=request.question,
-            df_info={"columns": columns_info, "sample": sample_data},
-            provider=request.config.provider,
-            model_name=request.config.model_name,
-            local_url=request.config.local_url,
-            context_window=request.config.context_window,
-            api_key=request.config.api_key,
-        )
-        return LLMResponse(content=result)
-    except Exception as e:
-        logging.exception("Query generation failed")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/query/fix", response_model=LLMResponse)
-async def fix_query(request: QueryFixRequest) -> LLMResponse:
-    """Fix pandas query errors using LLM."""
-    try:
-        result = await llm_service.analyze_text(
-            text_content="",
-            user_instruction=(
-                f"Fix this query: {request.original_code}"
-                f"\nError: {request.error_message}"
-            ),
-            provider=request.config.provider,
-            model_name=request.config.model_name,
-            local_url=request.config.local_url,
-            context_window=request.config.context_window,
-            api_key=request.config.api_key,
-        )
-        return LLMResponse(content=result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
 
 
 class InterpretRequest(BaseModel):

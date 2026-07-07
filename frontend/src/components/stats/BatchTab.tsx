@@ -19,7 +19,6 @@ import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { analyzeBatch, BatchAnalyzeResponse, DiagnosticResponse } from "@/lib/api";
 import { Package, Puzzle, BarChart3, Settings, Sparkles, Search, Loader2, Rocket, Download } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useDocumentStore } from "@/stores/document-store";
 
 interface BatchTabProps {
     selectedDoc: string | null;
@@ -29,7 +28,6 @@ interface BatchTabProps {
 
 export function BatchTab({ selectedDoc, filePath, diagnostics }: BatchTabProps) {
     const { provider, model_name, local_url, api_key } = useSettingsStore();
-    const { documents } = useDocumentStore();
 
     const [processing, setProcessing] = useState(false);
     const [groupByCols, setGroupByCols] = useState<string[]>([]);

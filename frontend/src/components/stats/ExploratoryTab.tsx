@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DescriptiveTab } from "./DescriptiveTab";
 import { CorrelationTab } from "./CorrelationTab";
 import { GroupByTab } from "./GroupByTab";
-import { Ruler, Link, Boxes } from "lucide-react";
+import { PivotTab } from "./PivotTab";
+import { Ruler, Link, Boxes, Grid3x3 } from "lucide-react";
 import { DiagnosticResponse, EDAResponse, LLMConfig } from "@/lib/api";
 
 interface ExploratoryTabProps {
@@ -56,6 +57,12 @@ export function ExploratoryTab({
                         >
                             <Boxes size={14} className="mr-2"/> 分組/交叉分析
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="pivot"
+                            className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-2 pb-2 pt-1"
+                        >
+                            <Grid3x3 size={14} className="mr-2"/> 交叉透視
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -86,6 +93,10 @@ export function ExploratoryTab({
                         diagnostics={diagnostics}
                         onRunGroupBy={(params) => onRunEDA("groupby", params)}
                     />
+                </TabsContent>
+
+                <TabsContent value="pivot" className="mt-0">
+                    <PivotTab selectedDoc={selectedDoc} diagnostics={diagnostics} />
                 </TabsContent>
             </Tabs>
         </div>
