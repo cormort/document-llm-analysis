@@ -471,7 +471,7 @@ class LLMProviders:
 
         try:
             genai.configure(api_key=api_key_input)
-            models = genai.list_models()
+            models = genai.list_models(request_options={"timeout": 10})
             return [
                 m.name.replace("models/", "")
                 for m in models

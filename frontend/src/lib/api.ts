@@ -416,7 +416,8 @@ export async function listModels(
     });
     if (apiKey) params.append("api_key", apiKey);
 
-    return fetchAPI(`/api/llm/models?${params.toString()}`);
+    // 列模型清單應在秒級完成；後端對 provider 的請求本身有 10 秒 timeout
+    return fetchAPI(`/api/llm/models?${params.toString()}`, { timeoutMs: 15000 });
 }
 
 // Reports API
