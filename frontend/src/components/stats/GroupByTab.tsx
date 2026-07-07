@@ -14,7 +14,7 @@ interface GroupByTabProps {
     processing: boolean;
     edaResults: EDAResponse | null;
     diagnostics: DiagnosticResponse | null;
-    onRunGroupBy: (params: { group_col: string; target_col: string; agg_func: string }) => void;
+    onRunGroupBy: (params: { group_col: string; target_col: string; agg: string }) => void;
 }
 
 export function GroupByTab({
@@ -33,7 +33,7 @@ export function GroupByTab({
         onRunGroupBy({
             group_col: selectedGroupCol,
             target_col: selectedTargetCol,
-            agg_func: selectedAggFunc
+            agg: selectedAggFunc
         });
     };
 
