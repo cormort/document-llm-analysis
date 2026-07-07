@@ -68,7 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-export async function login(username: string, password: string): Promise<{ user: User; token: string }> {
+export async function login(username: string, password: string): Promise<{ user: User; access_token: string }> {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -78,14 +78,18 @@ export async function login(username: string, password: string): Promise<{ user:
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || "登入失敗");
   }
-  return res.json();
+  const data = await res.json();
+  return {
+    user: data.user,
+    access_token: data.access_token,
+  };
 }
 
 export async function register(
   username: string,
   email: string,
   password: string
-): Promise<{ user: User; token: string }> {
+): Promise<{ user: User; access_token: string }> {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -95,5 +99,9 @@ export async function register(
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || "註冊失敗");
   }
-  return res.json();
+  const data = await res.json();
+  return {
+    user: data.user,
+    access_token: data.access_token,
+  };
 }

@@ -158,7 +158,7 @@ export function LLMQueueBanner() {
                   排隊中：第 {status.your_position} 位
                 </div>
                 <div className="text-xs text-slate-500">
-                  預計等待 {status.your_position * 30} 秒
+                  預計等待 {(status.your_position ?? 0) * 30} 秒
                 </div>
               </div>
             </>

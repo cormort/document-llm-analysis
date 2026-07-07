@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { FileUploader } from "@/components/file-uploader";
-import { nlToSQL, NLToSQLResponse, getDiagnostic, DiagnosticResponse } from "@/lib/api";
+import { nlToSQL, nlToSQLInterpret, NLToSQLResponse, getDiagnostic, DiagnosticResponse } from "@/lib/api";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useDataFileStore } from "@/stores/data-file-store";
 import {
@@ -33,9 +33,11 @@ export default function QueryPage() {
     const { files, fetchFiles } = useDataFileStore();
 
     const [processing, setProcessing] = useState(false);
+    const [interpreting, setInterpreting] = useState(false);
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [question, setQuestion] = useState("");
     const [result, setResult] = useState<NLToSQLResponse | null>(null);
+    const [interpretation, setInterpretation] = useState<string | null>(null);
     const [metadata, setMetadata] = useState<DiagnosticResponse | null>(null);
 
     useEffect(() => { fetchFiles(); }, [fetchFiles]);
@@ -52,6 +54,7 @@ export default function QueryPage() {
         if (!selectedFile || !question.trim()) return;
         setProcessing(true);
         setResult(null);
+        setInterpretation(null);
         try {
             const res = await nlToSQL(selectedFile, question, {
                 provider, model_name, local_url, api_key: api_key || undefined
@@ -61,6 +64,25 @@ export default function QueryPage() {
             setResult({ sql: "", success: false, error: err instanceof Error ? err.message : "查詢失敗" });
         } finally {
             setProcessing(false);
+        }
+    };
+
+    const handleInterpret = async () => {
+        if (!result || !result.data) return;
+        setInterpreting(true);
+        try {
+            const res = await nlToSQLInterpret(
+                question,
+                result.sql,
+                result.data as Record<string, unknown>[],
+                result.data.length,
+                { provider, model_name, local_url, api_key: api_key || undefined }
+            );
+            setInterpretation(res.interpretation);
+        } catch (err) {
+            setInterpretation(`解讀失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+        } finally {
+            setInterpreting(false);
         }
     };
 
@@ -274,15 +296,39 @@ export default function QueryPage() {
                                     )}
                                 </Card>
 
-                                {/* AI interpretation */}
-                                {result.interpretation && (
+                                {/* AI interpretation — on demand */}
+                                {result.success && result.data && result.data.length > 0 && (
                                     <Card className="p-6 border-blue-100 bg-blue-50/30">
-                                        <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                                            <Bot size={20} className="text-blue-600"/> 智慧解讀
-                                        </h3>
-                                        <div className="text-slate-700 leading-relaxed">
-                                            <MarkdownRenderer content={result.interpretation}/>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="font-semibold text-blue-800 flex items-center gap-2">
+                                                <Bot size={20} className="text-blue-600"/> 智慧解讀
+                                            </h3>
+                                            {!interpretation && !interpreting && (
+                                                <Button
+                                                    onClick={handleInterpret}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                                                >
+                                                    <Sparkles size={14} className="mr-1.5"/> 產生解讀
+                                                </Button>
+                                            )}
                                         </div>
+                                        {interpreting && (
+                                            <div className="space-y-2">
+                                                <Skeleton className="h-4 w-full"/>
+                                                <Skeleton className="h-4 w-4/5"/>
+                                                <Skeleton className="h-4 w-3/5"/>
+                                            </div>
+                                        )}
+                                        {interpretation && !interpreting && (
+                                            <div className="text-slate-700 leading-relaxed">
+                                                <MarkdownRenderer content={interpretation}/>
+                                            </div>
+                                        )}
+                                        {!interpretation && !interpreting && (
+                                            <p className="text-sm text-blue-400">點擊「產生解讀」讓 AI 分析查詢結果的洞察與意義。</p>
+                                        )}
                                     </Card>
                                 )}
                             </>

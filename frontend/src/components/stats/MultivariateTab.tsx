@@ -97,7 +97,7 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
                     <Card className="p-6 bg-white shadow-sm border-slate-100 flex flex-col h-[350px]">
                         <h4 className="font-bold text-slate-700 mb-4 text-sm">主成分散佈圖 (PC1 vs PC2)</h4>
                         <div className="flex-1 min-h-0 w-full relative">
-                            {data.n_components >= 2 ? (
+                            {(data.n_components ?? 0) >= 2 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: -20 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -124,7 +124,7 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
                                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                    <Tooltip formatter={(val: number) => val.toFixed(2) + '%'} />
+                                    <Tooltip formatter={(val) => typeof val === 'number' ? val.toFixed(2) + '%' : String(val)} />
                                     <Bar dataKey="variance" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
