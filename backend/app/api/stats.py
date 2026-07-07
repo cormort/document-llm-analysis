@@ -90,6 +90,8 @@ router = APIRouter()
 def _load_sliced(request) -> "pd.DataFrame":
     """Load dataframe and apply the request's global slice filters, if any."""
     df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
     filters = getattr(request, "filters", None)
     if filters:
         df, _ = apply_filters(df, [f.model_dump() for f in filters])
