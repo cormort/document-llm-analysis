@@ -34,9 +34,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: process.env.BACKEND_URL
-          ? `${process.env.BACKEND_URL}/api/:path*`
-          : "http://127.0.0.1:8080/api/:path*",
+        // 預設埠是 8000（後端實際埠）；8080 是舊的錯誤預設值。
+        // 容器部署時由 compose 注入 BACKEND_URL=http://backend:8000。
+        destination: `${
+          process.env.BACKEND_URL ?? "http://127.0.0.1:8000"
+        }/api/:path*`,
       },
     ];
   },

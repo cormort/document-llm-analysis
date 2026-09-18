@@ -16,8 +16,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time environment variables
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+# 注意：不要把容器內部主機名（例如 http://backend:8000）編進前端 bundle ——
+# 那是「瀏覽器」解析不到的名字。瀏覽器一律走同源的 /api/*，
+# 由 next.config.ts 的 rewrites 在「伺服器端」轉發到 BACKEND_URL。
+# NEXT_PUBLIC_API_URL 留空 = 使用相對路徑（建議值）。
+ARG NEXT_PUBLIC_API_URL=""
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1 \
 NODE_ENV=production

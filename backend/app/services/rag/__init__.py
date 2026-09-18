@@ -1,6 +1,9 @@
 """
 RAG sub-package — re-exports RAGService and rag_service singleton
 so that existing imports continue to work unchanged.
+
+`base.py` 的重量級依賴（chromadb / torch / sentence-transformers）已經改成
+延遲載入，因此 import 這個套件不會拉起整套 ML 堆疊。
 """
 
 from app.services.rag.base import RAGBase

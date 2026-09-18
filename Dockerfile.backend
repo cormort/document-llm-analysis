@@ -14,13 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend pyproject.toml first for caching
-COPY backend/pyproject.toml /app/backend/
+# 用 uv + uv.lock 安裝，確保建置可重現（原本 pip install . 會忽略 lock 檔，
+# 而 pyproject 全部是 >= 下限，每次 build 可能拿到不同版本）。
+COPY backend/pyproject.toml backend/uv.lock /app/backend/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir hatchling && \
-    cd backend && pip install --no-cache-dir .
+RUN pip install --no-cache-dir uv && \
+    cd backend && uv export --frozen --no-dev --no-emit-project -o requirements.lock.txt && \
+    uv pip install --system --no-cache -r requirements.lock.txt
 
 # Copy backend source
 COPY backend/app /app/backend/app

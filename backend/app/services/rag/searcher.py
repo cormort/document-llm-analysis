@@ -18,21 +18,29 @@ MAX_N_RESULTS = 100
 class RAGSearcherMixin:
     """Provides all search and context retrieval capabilities to RAGService."""
 
+    def _resolve_collection(self, collection_name: str | None):
+        """解析要查詢的 collection。
+
+        併發安全：`self.collection` 是可變的共用狀態（indexing 與
+        switch_to_document 都會改寫它）。查詢時若呼叫端提供了
+        `collection_name`，一律以參數為準，不讀取也不改寫 `self.collection`。
+        """
+        if collection_name:
+            if not self._lazy_init():
+                return None
+            try:
+                return self.client.get_collection(collection_name)
+            except Exception:
+                logger.warning(f"Collection {collection_name} not found")
+                return None
+        return self.collection
+
     async def search(
         self, query: str, n_results: int = 5, collection_name: str = None
     ) -> list[dict]:
         """Basic semantic search on a specific or default collection."""
         n_results = min(n_results, MAX_N_RESULTS)
-        target_collection = self.collection
-
-        if collection_name:
-            if not self._lazy_init():
-                return []
-            try:
-                target_collection = self.client.get_collection(collection_name)
-            except Exception:
-                logger.warning(f"Collection {collection_name} not found")
-                return []
+        target_collection = self._resolve_collection(collection_name)
 
         if not target_collection:
             logger.warning("No collection available for search")
@@ -154,15 +162,7 @@ class RAGSearcherMixin:
         if weights is None:
             weights = {"vector": 0.7, "keyword": 0.3}
 
-        target_collection = self.collection
-        if collection_name:
-            if not self._lazy_init():
-                return []
-            try:
-                target_collection = self.client.get_collection(collection_name)
-            except Exception:
-                logger.warning(f"Collection {collection_name} not found")
-                return []
+        target_collection = self._resolve_collection(collection_name)
 
         if not target_collection:
             return []
@@ -267,15 +267,25 @@ class RAGSearcherMixin:
         tau_a: float = 0.5,
         tau_d: float = 0.45,
         tau_r: float = 0.5,
+        collection_name: str | None = None,
     ) -> str:
-        """Get enhanced context for SA-RAG with optional graph augmentation."""
+        """Get enhanced context for SA-RAG with optional graph augmentation.
+
+        `collection_name` 會一路傳給底層搜尋，避免依賴共用可變狀態。
+        """
         from app.services.graph_rag_service import graph_rag_service
         from app.services.llm_service import llm_service
 
+        target_collection = self._resolve_collection(collection_name)
+
         if use_rerank and self.reranker:
-            results = await self.search_with_rerank(query, n_results * 2)
+            results = await self.search_with_rerank(
+                query, n_results * 2, collection_name=collection_name
+            )
         else:
-            results = await self.search(query, n_results * 2)
+            results = await self.search(
+                query, n_results * 2, collection_name=collection_name
+            )
 
         filtered_results = [
             r for r in results if (1.0 - r.get("distance", 1.0)) >= tau_d
@@ -301,7 +311,7 @@ class RAGSearcherMixin:
                     activated_chunk_ids = graph_rag_service.spreading_activation(
                         seed_entities, threshold=tau_a
                     )
-                    if activated_chunk_ids and self.collection:
+                    if activated_chunk_ids and target_collection:
                         target_cids = [
                             cid
                             for cid in activated_chunk_ids
@@ -311,7 +321,7 @@ class RAGSearcherMixin:
                             )
                         ]
                         if target_cids:
-                            res = self.collection.get(
+                            res = target_collection.get(
                                 where={"chunk_id": {"$in": target_cids[:5]}},
                                 include=["documents", "metadatas"],
                             )
@@ -372,7 +382,6 @@ class RAGSearcherMixin:
         7. Context compression (optional)
         """
         n_results = min(n_results, MAX_N_RESULTS)
-        from app.services.graph_rag_service import graph_rag_service
 
         stats = {
             "original_query": query,
@@ -382,8 +391,9 @@ class RAGSearcherMixin:
             "final_results": 0,
         }
 
-        if collection_name:
-            self.switch_to_document(collection_name)
+        # 注意：這裡刻意不改寫 self.collection（switch_to_document）。
+        # 所有底層查詢都已帶入 collection_name，改寫共用狀態只會讓併發請求
+        # 互相污染檢索結果。
 
         # 1. Query Expansion
         queries = [query]
@@ -448,6 +458,8 @@ class RAGSearcherMixin:
         stats["final_results"] = len(final_results)
 
         if use_graph and final_results:
+            from app.services.graph_rag_service import graph_rag_service
+
             try:
                 for r in final_results:
                     chunk_id = r.get("metadata", {}).get("chunk_id")

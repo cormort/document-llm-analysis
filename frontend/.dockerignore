@@ -1,0 +1,18 @@
+# 前端 build context 不該包含本機產物與密鑰
+node_modules
+.next
+out
+build
+coverage
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+.dockerignore
+README.md
+PERFORMANCE.md

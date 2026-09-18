@@ -367,11 +367,20 @@ async def convert_to_markdown(file_path: str) -> dict[str, Any]:
     Returns:
         {"success": bool, "markdown": str, "error": str?}
     """
+    from pathlib import Path as _Path
+
+    from app.utils.file_resolver import is_within_allowed_roots
+
     manager = MCPClientManager()
     await manager.initialize()
 
-    # 轉換為 file:// URI
+    # 轉換為 file:// URI（僅允許資料目錄內的檔案，避免任意檔案讀取）
     if os.path.exists(file_path):
+        if not is_within_allowed_roots(_Path(file_path)):
+            return {
+                "success": False,
+                "error": "只能轉換資料目錄內的檔案",
+            }
         uri = f"file://{os.path.abspath(file_path)}"
     elif file_path.startswith(("http://", "https://", "file://", "data:")):
         uri = file_path

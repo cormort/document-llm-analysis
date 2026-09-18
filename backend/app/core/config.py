@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # Upload
     MAX_UPLOAD_SIZE_MB: int = 50
 
+    # /metrics 是否要求認證（Prometheus 需帶 token；純內網可設 false）
+    METRICS_REQUIRE_AUTH: bool = True
+
     # 是否允許 LLM/MCP 的 URL 指向私有網段（本機 Ollama / LM Studio 需要）。
     # 雲端 metadata 與 link-local 位址永遠禁止，不受此設定影響。
     ALLOW_PRIVATE_LLM_URLS: bool = True

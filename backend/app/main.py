@@ -6,8 +6,9 @@ Includes CORS, rate limiting, exception handling, and secure logging.
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api import (
@@ -29,6 +30,7 @@ from app.api import (
     upload,
     users,
 )
+from app.api.auth import get_current_admin_user
 from app.api.cache_maintenance import router as cache_router
 from app.api.chroma_maintenance import router as chroma_router
 from app.api.deps import require_auth
@@ -54,7 +56,22 @@ app = FastAPI(
 
 register_exception_handlers(app)
 
-Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+Instrumentator().instrument(app)
+
+
+_metrics_dependencies = (
+    [Depends(require_auth)] if settings.METRICS_REQUIRE_AUTH else []
+)
+
+
+@app.get("/metrics", include_in_schema=False, dependencies=_metrics_dependencies)
+def metrics_endpoint() -> Response:
+    """Prometheus 指標。
+
+    原本這個端點完全公開；在 production 下預設要求認證
+    （可透過 METRICS_REQUIRE_AUTH=false 讓內網 scraper 免認證）。
+    """
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 cors_origins: list[str] = (
     [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
@@ -137,14 +154,18 @@ app.include_router(
 app.include_router(
     mcp_tools.router, prefix="/api", tags=["MCP Tools"], dependencies=_needs_auth
 )
+# 這兩個是「破壞性維運」端點（清除向量庫 / 清快取），只允許管理員。
 app.include_router(
     chroma_router,
     prefix="/api",
     tags=["ChromaDB Maintenance"],
-    dependencies=_needs_auth,
+    dependencies=[Depends(get_current_admin_user)],
 )
 app.include_router(
-    cache_router, prefix="/api", tags=["Cache Maintenance"], dependencies=_needs_auth
+    cache_router,
+    prefix="/api",
+    tags=["Cache Maintenance"],
+    dependencies=[Depends(get_current_admin_user)],
 )
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])

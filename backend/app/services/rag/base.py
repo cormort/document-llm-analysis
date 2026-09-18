@@ -8,18 +8,13 @@ import hashlib
 import os
 from concurrent.futures import ThreadPoolExecutor
 
-import chromadb
 import structlog
 
-try:
-    import torch
-except ImportError:
-    torch = None
-
-from app.services.context_compressor import ContextCompressor
-from app.services.semantic_chunker import SemanticChunker
-from sentence_transformers import CrossEncoder, SentenceTransformer
 from app.core.metrics import CHROMADB_QUERY_LATENCY_SECONDS
+
+# 重量級依賴（chromadb / torch / sentence-transformers / 壓縮器 / 切塊器）
+# 一律在真正需要時才載入，讓這個模組（以及整個 rag 子套件）可以在沒有
+# ML 堆疊的環境被 import —— 例如只測搜尋邏輯的單元測試。
 
 logger = structlog.get_logger()
 
@@ -54,12 +49,16 @@ class RAGBase:
 
     def _get_device(self) -> str:
         """Auto-detect best available device (MPS > CUDA > CPU)."""
-        if torch is None:
-            return "cpu"
-        if torch.backends.mps.is_available():
-            return "mps"
-        if torch.cuda.is_available():
-            return "cuda"
+        try:
+            import torch
+
+            if torch.backends.mps.is_available():
+                return "mps"
+            if torch.cuda.is_available():
+                return "cuda"
+        except (ImportError, AttributeError):
+            # 沒有 torch、或是精簡版/stub 缺少 backend 時一律回退 CPU
+            pass
         return "cpu"
 
     def _lazy_init(self) -> bool:
@@ -70,7 +69,12 @@ class RAGBase:
         try:
             logger.info("Initializing RAG Service", device=self.device)
 
+            import chromadb
+            from sentence_transformers import CrossEncoder, SentenceTransformer
+
+            from app.services.context_compressor import ContextCompressor
             from app.services.llm_service import llm_service
+            from app.services.semantic_chunker import SemanticChunker
 
             model_name = "BAAI/bge-m3"
             self.embedder = SentenceTransformer(model_name, device=self.device)
