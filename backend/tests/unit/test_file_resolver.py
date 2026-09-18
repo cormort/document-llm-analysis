@@ -1,6 +1,5 @@
 """Tests for file resolver utilities."""
 
-
 from app.utils.file_resolver import (
     convert_numpy_types,
     get_dataframe_info,
@@ -48,9 +47,7 @@ class TestResolveDataFile:
         monkeypatch.setattr(
             file_resolver, "ALLOWED_ROOTS", (tmp_path / "data",), raising=True
         )
-        monkeypatch.setattr(
-            file_resolver, "SEARCH_PATHS", [data_dir], raising=True
-        )
+        monkeypatch.setattr(file_resolver, "SEARCH_PATHS", [data_dir], raising=True)
 
         assert file_resolver.resolve_data_file("ok.csv") == target
 

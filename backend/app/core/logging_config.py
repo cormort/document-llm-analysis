@@ -41,9 +41,11 @@ class SensitiveDataFilter(logging.Filter):
         msg = record.getMessage()
         for pattern in self._PATTERNS:
             msg = pattern.sub(
-                lambda m: f"{m.group(1)}=[REDACTED]"
-                if m.lastindex and m.lastindex >= 2
-                else "[REDACTED]",
+                lambda m: (
+                    f"{m.group(1)}=[REDACTED]"
+                    if m.lastindex and m.lastindex >= 2
+                    else "[REDACTED]"
+                ),
                 msg,
             )
         record.msg = msg

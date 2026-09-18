@@ -1,13 +1,13 @@
 class PromptManager:
     """Manages LLM prompts and templates."""
-    
+
     ANALYSIS_PROMPT = """
     You are an expert document analyst. Please analyze the following text and provide a comprehensive report.
     User Instructions: {user_instruction}
     Content:
     {content}
     """
-    
+
     REPORT_GEN_PROMPT = """
     Based on the provided content, generate a structured {report_type}.
     Content: {content}
@@ -50,12 +50,16 @@ class PromptManager:
 
     @classmethod
     def get_extraction_prompt(cls, content: str) -> str:
-        return cls.EXTRACT_ENTITIES_PROMPT.format(content=content[:10000]) # Truncate for safety
+        return cls.EXTRACT_ENTITIES_PROMPT.format(
+            content=content[:10000]
+        )  # Truncate for safety
 
     @classmethod
     def get_analysis_prompt(cls, content: str, user_instruction: str) -> str:
-        return cls.ANALYSIS_PROMPT.format(content=content, user_instruction=user_instruction)
-    
+        return cls.ANALYSIS_PROMPT.format(
+            content=content, user_instruction=user_instruction
+        )
+
     @classmethod
     def get_system_prompt(cls, key: str = "general") -> str:
         return cls.SYSTEM_PROMPTS.get(key, cls.SYSTEM_PROMPTS["general"])

@@ -184,7 +184,10 @@ function FieldAnalysisSection({ diagnostics }: { diagnostics: DiagnosticResponse
     const [selectedField, setSelectedField] = useState<string>("");
     const [analysis, setAnalysis] = useState<string>("");
     const [loading, setLoading] = useState(false);
-    const { provider, model_name, local_url, api_key } = useSettingsStore();
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
 
     // Filter numeric fields
     const numericFields = diagnostics.quality_report.filter(
@@ -271,7 +274,10 @@ function FieldAnalysisSection({ diagnostics }: { diagnostics: DiagnosticResponse
 function FeatureSuggestionsSection({ quality_report }: { quality_report: DataQualityItem[] }) {
     const [suggestions, setSuggestions] = useState<string>("");
     const [loading, setLoading] = useState(false);
-    const { provider, model_name, local_url, api_key } = useSettingsStore();
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
 
     const handleSuggest = async () => {
         setLoading(true);
@@ -336,7 +342,10 @@ function FeatureSuggestionsSection({ quality_report }: { quality_report: DataQua
 function DatasetAnalysisSection({ diagnostics }: { diagnostics: DiagnosticResponse }) {
     const [analysis, setAnalysis] = useState<string>("");
     const [loading, setLoading] = useState(false);
-    const { provider, model_name, local_url, api_key } = useSettingsStore();
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
 
     const handleAnalyze = async () => {
         setLoading(true);

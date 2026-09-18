@@ -1,7 +1,7 @@
 """RAG 搜尋的併發安全測試。
 
 原本 `get_optimized_context()` 會呼叫 `switch_to_document()` 改寫共用的
-`self.collection`，兩個同時進行的請求會互相污染檢索結果。這裡用 stub client
+`default_collection`，兩個同時進行的請求會互相污染檢索結果。這裡用 stub client
 驗證：查詢路徑不再改寫共用狀態，且每個請求都使用自己指定的 collection。
 """
 
@@ -55,7 +55,7 @@ class StubSearcher(RAGSearcherMixin):
     """只帶搜尋 mixin 的輕量受測物件（不載入 chromadb）。"""
 
     def __init__(self):
-        self.collection = None
+        self.default_collection = None
         self.embedder = StubEmbedder()
         self.reranker = None
         self.context_compressor = None
@@ -73,13 +73,15 @@ class StubSearcher(RAGSearcherMixin):
 async def test_optimized_context_does_not_mutate_shared_collection():
     searcher = StubSearcher()
     default = StubCollection("default")
-    searcher.collection = default
+    searcher.default_collection = default
 
     result = await searcher.get_optimized_context(
         query="問題", collection_name="docA", use_hybrid=False, use_rerank=False
     )
 
-    assert searcher.collection is default, "查詢不應該改寫共用的 self.collection"
+    assert searcher.default_collection is default, (
+        "查詢不應該改寫共用的 default_collection"
+    )
     assert result["sources"][0]["metadata"]["source"] == "docA"
 
 
@@ -101,7 +103,7 @@ async def test_concurrent_queries_use_their_own_collection():
 @pytest.mark.asyncio
 async def test_search_uses_explicit_collection():
     searcher = StubSearcher()
-    searcher.collection = StubCollection("default")
+    searcher.default_collection = StubCollection("default")
 
     results = await searcher.search("q", n_results=1, collection_name="docX")
 
@@ -111,7 +113,7 @@ async def test_search_uses_explicit_collection():
 @pytest.mark.asyncio
 async def test_search_falls_back_to_default_collection():
     searcher = StubSearcher()
-    searcher.collection = StubCollection("default")
+    searcher.default_collection = StubCollection("default")
 
     results = await searcher.search("q", n_results=1)
 

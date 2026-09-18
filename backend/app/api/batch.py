@@ -24,6 +24,8 @@ async def load_dataframe_async(file_path: str):
     event loop（單一 worker 時整個服務都會被拖住）。
     """
     return await run_in_threadpool(load_dataframe, file_path)
+
+
 DATA_DIR = Path("data")
 
 

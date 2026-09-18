@@ -47,6 +47,7 @@ class DiagnosticRequest(BaseModel):
     file_path: str
     config: LLMConfig = Field(default_factory=LLMConfig)
 
+
 class DataQualityItem(BaseModel):
     column: str
     dtype: str
@@ -55,10 +56,12 @@ class DataQualityItem(BaseModel):
     unique_count: int
     sample_values: list[Any]
 
+
 class DiagnosticResponse(BaseModel):
     summary_stats: dict[str, Any]
     quality_report: list[DataQualityItem]
     interpretation: str | None = None
+
 
 class EDARequest(BaseModel):
     file_path: str
@@ -67,21 +70,28 @@ class EDARequest(BaseModel):
     config: LLMConfig = Field(default_factory=LLMConfig)
     skip_interpretation: bool = False
 
+
 class EDAResponse(BaseModel):
     result_data: Any
     interpretation: str | None = None
 
+
 class StatTestRequest(BaseModel):
     file_path: str
-    test_type: str = Field(..., description="ttest, anova, shapiro, outliers, chi_square, mann_whitney, kruskal, wilcoxon")
+    test_type: str = Field(
+        ...,
+        description="ttest, anova, shapiro, outliers, chi_square, mann_whitney, kruskal, wilcoxon",
+    )
     target_columns: list[str]
     group_column: str | None = None
     config: LLMConfig = Field(default_factory=LLMConfig)
+
 
 class StatTestResponse(BaseModel):
     test_results: dict[str, Any]
     interpretation: str | None = None
     suggestion: dict[str, Any] | None = None
+
 
 class MultivariateRequest(BaseModel):
     file_path: str
@@ -91,6 +101,7 @@ class MultivariateRequest(BaseModel):
     n_clusters: int = Field(3, description="Number of clusters for KMeans")
     config: LLMConfig = Field(default_factory=LLMConfig)
 
+
 class MultivariateResponse(BaseModel):
     analysis_type: str
     data: list[dict[str, Any]]
@@ -99,14 +110,17 @@ class MultivariateResponse(BaseModel):
     cluster_centers: dict[str, dict[str, float]] | None = None
     interpretation: str | None = None
 
+
 class InterpretStatsRequest(BaseModel):
     context: str
     data_summary: str
     test_type: str
     config: LLMConfig = Field(default_factory=LLMConfig)
 
+
 class InterpretStatsResponse(BaseModel):
     interpretation: str
+
 
 class TransformRequest(BaseModel):
     file_path: str
@@ -114,15 +128,18 @@ class TransformRequest(BaseModel):
     expression: str
     config: LLMConfig = Field(default_factory=LLMConfig)
 
+
 class TransformResponse(BaseModel):
     success: bool
     new_column: str
     values: list[Any]
     preview: list[dict[str, Any]]
 
+
 class GetDataRequest(BaseModel):
     file_path: str
     columns: list[str]
+
 
 class FieldAnalysisRequest(BaseModel):
     field_name: str
@@ -130,12 +147,15 @@ class FieldAnalysisRequest(BaseModel):
     sample_values: list[Any]
     config: LLMConfig = Field(default_factory=LLMConfig)
 
+
 class FieldAnalysisResponse(BaseModel):
     interpretation: str
+
 
 class FeatureSuggestionsRequest(BaseModel):
     schema_info: str
     config: LLMConfig = Field(default_factory=LLMConfig)
+
 
 class FeatureSuggestionsResponse(BaseModel):
     suggestions: str
@@ -150,7 +170,6 @@ class DatasetAnalysisResponse(BaseModel):
     interpretation: str
 
 
-
 # Data Prep Models
 class ImputeRequest(BaseModel):
     file_path: str
@@ -158,10 +177,12 @@ class ImputeRequest(BaseModel):
     method: str = Field(..., description="mean, median, mode, constant")
     fill_value: Any = None
 
+
 class EncodeRequest(BaseModel):
     file_path: str
     column: str
     method: str = Field(..., description="label, onehot")
+
 
 class DataPrepResponse(BaseModel):
     success: bool
@@ -169,9 +190,11 @@ class DataPrepResponse(BaseModel):
     new_columns: list[str] = []
     preview: list[dict[str, Any]]
 
+
 # DuckDB SQL Query Models
 class SQLQueryRequest(BaseModel):
     """Request model for DuckDB SQL queries."""
+
     file_path: str
     sql: str
     config: LLMConfig = Field(default_factory=LLMConfig)
@@ -179,6 +202,7 @@ class SQLQueryRequest(BaseModel):
 
 class SQLQueryResponse(BaseModel):
     """Response model for DuckDB SQL query results."""
+
     success: bool
     data: list[dict[str, Any]] | None = None
     summary: str | None = None
@@ -188,6 +212,7 @@ class SQLQueryResponse(BaseModel):
 
 class NLToSQLRequest(BaseModel):
     """Request model for natural language to SQL conversion."""
+
     file_path: str
     question: str
     config: LLMConfig = Field(default_factory=LLMConfig)
@@ -195,6 +220,7 @@ class NLToSQLRequest(BaseModel):
 
 class NLToSQLResponse(BaseModel):
     """Response model with generated SQL and results."""
+
     sql: str
     success: bool
     data: list[dict[str, Any]] | None = None

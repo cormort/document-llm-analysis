@@ -101,9 +101,7 @@ class TestSettingsHardening:
         from app.core import config as config_module
 
         monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
-        monkeypatch.setattr(
-            config_module, "_DEV_SECRET_FILE", tmp_path / ".jwt_secret"
-        )
+        monkeypatch.setattr(config_module, "_DEV_SECRET_FILE", tmp_path / ".jwt_secret")
         first = Settings(ENVIRONMENT="development")
         second = Settings(ENVIRONMENT="development")
         assert first.JWT_SECRET_KEY

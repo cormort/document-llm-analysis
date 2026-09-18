@@ -60,7 +60,8 @@ async def test_plain_text_passes_through():
 @pytest.mark.asyncio
 async def test_similar_tag_is_not_treated_as_thought():
     """<thinktank> 不該被當成思考標籤。"""
-    assert await _run(["<thinktank>保留我</thinktank>"]) == "<thinktank>保留我</thinktank>"
+    expected = "<thinktank>保留我</thinktank>"
+    assert await _run([expected]) == expected
 
 
 @pytest.mark.asyncio

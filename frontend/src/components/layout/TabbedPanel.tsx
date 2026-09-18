@@ -10,7 +10,7 @@ type Tab = 'chat' | 'artifacts';
 
 export function TabbedPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
-  const { selectedDocuments } = useAppStore();
+  const selectedDocuments = useAppStore((s) => s.selectedDocuments);
   
   return (
     <div className="h-full flex flex-col bg-white">

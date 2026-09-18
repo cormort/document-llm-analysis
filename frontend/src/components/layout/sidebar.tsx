@@ -44,7 +44,9 @@ export function Sidebar() {
 const pathname = usePathname();
 const router = useRouter();
 const [collapsed, setCollapsed] = useState(false);
-const { user, isAuthenticated, logout } = useAuthStore();
+const user = useAuthStore((s) => s.user);
+const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+const logout = useAuthStore((s) => s.logout);
 const { trackClick } = useAnalytics();
 
 const handleLogout = () => {

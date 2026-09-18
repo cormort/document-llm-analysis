@@ -35,4 +35,3 @@ class AnalyticsEvent(Base):
 
     def __repr__(self) -> str:
         return f"<AnalyticsEvent {self.event_type}:{self.event_name}>"
-

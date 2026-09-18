@@ -21,9 +21,9 @@ class RAGSearcherMixin:
     def _resolve_collection(self, collection_name: str | None):
         """解析要查詢的 collection。
 
-        併發安全：`self.collection` 是可變的共用狀態（indexing 與
+        併發安全：`default_collection` 是可變的共用狀態（indexing 與
         switch_to_document 都會改寫它）。查詢時若呼叫端提供了
-        `collection_name`，一律以參數為準，不讀取也不改寫 `self.collection`。
+        `collection_name`，一律以參數為準，不讀取也不改寫 `default_collection`。
         """
         if collection_name:
             if not self._lazy_init():
@@ -33,7 +33,7 @@ class RAGSearcherMixin:
             except Exception:
                 logger.warning(f"Collection {collection_name} not found")
                 return None
-        return self.collection
+        return self.default_collection
 
     async def search(
         self, query: str, n_results: int = 5, collection_name: str = None
@@ -103,7 +103,9 @@ class RAGSearcherMixin:
             scores = await self._run_sync(
                 self.reranker.predict, pairs, show_progress_bar=False
             )
-            ranked = sorted(zip(all_results, scores, strict=False), key=lambda x: x[1], reverse=True)
+            ranked = sorted(
+                zip(all_results, scores, strict=False), key=lambda x: x[1], reverse=True
+            )
 
             final_results = []
             for result, score in ranked[:n_results]:
@@ -139,7 +141,9 @@ class RAGSearcherMixin:
                 self.reranker.predict, pairs, show_progress_bar=False
             )
             ranked = sorted(
-                zip(initial_results, scores, strict=False), key=lambda x: x[1], reverse=True
+                zip(initial_results, scores, strict=False),
+                key=lambda x: x[1],
+                reverse=True,
             )
             final_results = []
             for result, score in ranked[:n_results]:
@@ -202,7 +206,9 @@ class RAGSearcherMixin:
                 content_hash = hash(r["content"][:100])
                 if content_hash not in seen_content:
                     seen_content.add(content_hash)
-                    r["hybrid_score"] = (1.0 - r.get("distance", 1.0)) * weights["vector"]
+                    r["hybrid_score"] = (1.0 - r.get("distance", 1.0)) * weights[
+                        "vector"
+                    ]
                     r["match_type"] = "vector"
                     merged.append(r)
 
@@ -210,7 +216,9 @@ class RAGSearcherMixin:
                 content_hash = hash(r["content"][:100])
                 if content_hash not in seen_content:
                     seen_content.add(content_hash)
-                    r["hybrid_score"] = (1.0 - r.get("distance", 0.5)) * weights["keyword"]
+                    r["hybrid_score"] = (1.0 - r.get("distance", 0.5)) * weights[
+                        "keyword"
+                    ]
                     merged.append(r)
                 else:
                     for m in merged:
@@ -391,7 +399,7 @@ class RAGSearcherMixin:
             "final_results": 0,
         }
 
-        # 注意：這裡刻意不改寫 self.collection（switch_to_document）。
+        # 注意：這裡刻意不改寫 default_collection（switch_to_document）。
         # 所有底層查詢都已帶入 collection_name，改寫共用狀態只會讓併發請求
         # 互相污染檢索結果。
 
@@ -413,7 +421,9 @@ class RAGSearcherMixin:
             stats["search_method"] = "hybrid"
             for q in queries:
                 all_results.extend(
-                    await self.hybrid_search(q, collection_name, n_results=n_results * 2)
+                    await self.hybrid_search(
+                        q, collection_name, n_results=n_results * 2
+                    )
                 )
         else:
             for q in queries:
@@ -438,7 +448,9 @@ class RAGSearcherMixin:
                     self.reranker.predict, pairs, show_progress_bar=False
                 )
                 ranked = sorted(
-                    zip(unique_results[:30], scores, strict=False), key=lambda x: x[1], reverse=True
+                    zip(unique_results[:30], scores, strict=False),
+                    key=lambda x: x[1],
+                    reverse=True,
                 )
                 unique_results = []
                 for result, score in ranked:

@@ -11,9 +11,7 @@ import io
 from fastapi.testclient import TestClient
 
 
-def test_upload_valid_csv(
-    client: TestClient, sample_csv_content: bytes
-) -> None:
+def test_upload_valid_csv(client: TestClient, sample_csv_content: bytes) -> None:
     """上傳合法 CSV 檔案應成功。"""
     response = client.post(
         "/api/upload",
@@ -42,9 +40,7 @@ def test_upload_invalid_extension(client: TestClient) -> None:
     assert data["code"] == "FILE_VALIDATION_ERROR"
 
 
-def test_upload_path_traversal(
-    client: TestClient, sample_csv_content: bytes
-) -> None:
+def test_upload_path_traversal(client: TestClient, sample_csv_content: bytes) -> None:
     """路徑穿越攻擊的檔名應被清理。"""
     response = client.post(
         "/api/upload",

@@ -22,17 +22,19 @@ from app.services.rag_service import rag_service
 router = APIRouter()
 
 
-async def stream_rag_response(stream: AsyncGenerator[str, None]) -> AsyncGenerator[dict[str, str], None]:
+async def stream_rag_response(
+    stream: AsyncGenerator[str, None],
+) -> AsyncGenerator[dict[str, str], None]:
     """Stream real RAG response content via SSE with filtering."""
     from app.services.llm.stream_filter import StreamFilter
-    
+
     sf = StreamFilter()
     async for chunk in sf.filter_stream(stream):
         if chunk:
             # We wrap the content in a way that the frontend expects
             # Usually SSE data is just the text or a JSON
             yield {"event": "message", "data": chunk}
-    
+
     yield {"event": "done", "data": "[DONE]"}
 
 
@@ -157,7 +159,7 @@ async def query_documents_stream(request: RAGQueryRequest) -> EventSourceRespons
             context_window=request.config.context_window,
             api_key=api_key,
         )
- 
+
         return EventSourceResponse(stream_rag_response(stream))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

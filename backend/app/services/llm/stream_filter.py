@@ -53,7 +53,14 @@ class StreamFilter:
 
     # Gemma / DeepSeek / QwQ use <think>, others use <thinking> etc.
     # 注意順序不影響判定（會取最長匹配），但由長到短可讀性較好。
-    THOUGHT_TAGS = ["thinking", "thought", "reasoning", "scratchpad", "internal", "think"]
+    THOUGHT_TAGS = [
+        "thinking",
+        "thought",
+        "reasoning",
+        "scratchpad",
+        "internal",
+        "think",
+    ]
 
     def __init__(self):
         self.buffer = ""
@@ -85,8 +92,10 @@ class StreamFilter:
                     gt = lower.find(">", end)
                     if gt == -1:
                         return best  # 標籤尚未收尾，等更多資料
-                    if best is None or idx < best[0] or (
-                        idx == best[0] and len(tag) > len(best[1])
+                    if (
+                        best is None
+                        or idx < best[0]
+                        or (idx == best[0] and len(tag) > len(best[1]))
                     ):
                         best = (idx, tag, gt + 1)
                     break

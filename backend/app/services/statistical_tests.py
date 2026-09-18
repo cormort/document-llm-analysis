@@ -112,9 +112,7 @@ def run_shapiro_wilk(data: pd.Series) -> dict[str, Any]:
     }
 
 
-def detect_outliers_iqr(
-    data: pd.Series, multiplier: float = 1.5
-) -> dict[str, Any]:
+def detect_outliers_iqr(data: pd.Series, multiplier: float = 1.5) -> dict[str, Any]:
     """
     Detect outliers using the IQR method.
 
@@ -158,9 +156,7 @@ def detect_outliers_iqr(
     }
 
 
-def run_correlation_matrix(
-    df: pd.DataFrame, method: str = "pearson"
-) -> pd.DataFrame:
+def run_correlation_matrix(df: pd.DataFrame, method: str = "pearson") -> pd.DataFrame:
     """
     Calculate correlation matrix for numeric columns.
 
@@ -191,7 +187,7 @@ def run_mannwhitneyu(group1: pd.Series, group2: pd.Series) -> dict[str, Any]:
         "median1": float(g1_clean.median()),
         "median2": float(g2_clean.median()),
         "is_significant": p_val < 0.05,
-        "method": "Mann-Whitney U"
+        "method": "Mann-Whitney U",
     }
 
 
@@ -209,25 +205,26 @@ def run_kruskal(*groups: pd.Series) -> dict[str, Any]:
         "p_value": float(p_val),
         "n_groups": len(cleaned_groups),
         "is_significant": p_val < 0.05,
-        "method": "Kruskal-Wallis"
+        "method": "Kruskal-Wallis",
     }
+
 
 def run_wilcoxon(group1: pd.Series, group2: pd.Series) -> dict[str, Any]:
     """Execute Wilcoxon Signed-Rank Test (paired non-parametric)."""
     # Ensure same length and ignore NaNs pair-wise
     df = pd.DataFrame({"g1": group1, "g2": group2}).dropna()
-    
+
     if len(df) < 2:
         return {"error": "Insufficient paired data"}
-        
+
     statistic, p_val = stats.wilcoxon(df["g1"], df["g2"])
-    
+
     return {
         "statistic": float(statistic),
         "p_value": float(p_val),
         "median_diff": float((df["g1"] - df["g2"]).median()),
         "is_significant": p_val < 0.05,
-        "method": "Wilcoxon Signed-Rank"
+        "method": "Wilcoxon Signed-Rank",
     }
 
 
@@ -235,17 +232,18 @@ def run_chi_square(series1: pd.Series, series2: pd.Series) -> dict[str, Any]:
     """Execute Chi-Square Test of Independence for categorical variables."""
     # Create contingency table
     crosstab = pd.crosstab(series1, series2)
-    
+
     stat, p_val, dof, expected = stats.chi2_contingency(crosstab)
-    
+
     return {
         "statistic": float(stat),
         "p_value": float(p_val),
         "dof": int(dof),
         "is_significant": p_val < 0.05,
         "crosstab": crosstab.to_dict(),
-        "method": "Chi-Square Test"
+        "method": "Chi-Square Test",
     }
+
 
 def suggest_test(groups: list[pd.Series]) -> dict[str, Any]:
     """
@@ -278,88 +276,96 @@ def suggest_test(groups: list[pd.Series]) -> dict[str, Any]:
 
     return results
 
-def run_pca(df: pd.DataFrame, features: list[str], n_components: int = 2) -> dict[str, Any]:
+
+def run_pca(
+    df: pd.DataFrame, features: list[str], n_components: int = 2
+) -> dict[str, Any]:
     """Execute Principal Component Analysis (PCA)."""
     data = df[features].dropna()
-    
+
     if len(data) < max(3, n_components):
         return {"error": "Insufficient data for PCA"}
-    
+
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
-    
+
     pca = PCA(n_components=n_components)
     components = pca.fit_transform(scaled_data)
-    
+
     explained_variance = pca.explained_variance_ratio_.tolist()
-    
+
     feature_weights = {}
     for i in range(n_components):
-        feature_weights[f"PC{i+1}"] = pca.components_[i].tolist()
-        
+        feature_weights[f"PC{i + 1}"] = pca.components_[i].tolist()
+
     points = []
     for i in range(len(components)):
         point = {"id": int(data.index[i])}
         for j in range(n_components):
-            point[f"PC{j+1}"] = float(components[i, j])
+            point[f"PC{j + 1}"] = float(components[i, j])
         points.append(point)
-        
+
     return {
         "success": True,
         "n_components": n_components,
         "explained_variance": [float(v) for v in explained_variance],
         "feature_weights": feature_weights,
         "data": points,
-        "features_used": features
+        "features_used": features,
     }
 
-def run_kmeans(df: pd.DataFrame, features: list[str], n_clusters: int = 3) -> dict[str, Any]:
+
+def run_kmeans(
+    df: pd.DataFrame, features: list[str], n_clusters: int = 3
+) -> dict[str, Any]:
     """Execute K-Means Clustering."""
     data = df[features].dropna()
-    
+
     if len(data) < max(3, n_clusters):
         return {"error": "Insufficient data for K-Means Clustering"}
-        
+
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
-    
+
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
     labels = kmeans.fit_predict(scaled_data)
-    
+
     cluster_centers = {}
     data_with_labels = data.copy()
     data_with_labels["Cluster"] = labels
-    
+
     for c in range(n_clusters):
         cluster_data = data_with_labels[data_with_labels["Cluster"] == c]
         if len(cluster_data) > 0:
             center_dict = cluster_data[features].mean().to_dict()
-            cluster_centers[f"Cluster {c}"] = {k: float(v) for k, v in center_dict.items()}
+            cluster_centers[f"Cluster {c}"] = {
+                k: float(v) for k, v in center_dict.items()
+            }
         else:
             cluster_centers[f"Cluster {c}"] = {f: 0.0 for f in features}
-            
+
     # PCA to 2D just for visualization of clusters
     pca = PCA(n_components=min(2, len(features)))
     components = pca.fit_transform(scaled_data) if len(features) >= 2 else scaled_data
-    
+
     points = []
     for i in range(len(components)):
         point = {
             "id": int(data.index[i]),
             "cluster": int(labels[i]),
             "x": float(components[i, 0]),
-            "y": float(components[i, 1]) if components.shape[1] > 1 else 0.0
+            "y": float(components[i, 1]) if components.shape[1] > 1 else 0.0,
         }
         for f in features:
             point[f] = float(data.iloc[i][f])
         points.append(point)
-        
+
     return {
         "success": True,
         "n_clusters": n_clusters,
         "cluster_centers": cluster_centers,
         "data": points,
-        "features_used": features
+        "features_used": features,
     }
 
 
@@ -382,7 +388,9 @@ def apply_filters(df: pd.DataFrame, filters: list[dict]) -> pd.DataFrame:
         vals = f.get("values", [])
         if col and vals and col in result.columns:
             result = result[result[col].isin(vals)]
-            applied.append(f"{col}: {', '.join(map(str, vals[:3]))}{'...' if len(vals) > 3 else ''}")
+            applied.append(
+                f"{col}: {', '.join(map(str, vals[:3]))}{'...' if len(vals) > 3 else ''}"
+            )
 
     return result, applied
 
@@ -432,7 +440,7 @@ def run_isolation_forest(
         "anomaly_indices": anomaly_indices,
         "anomaly_scores": anomaly_scores,
         "features_used": features,
-        "contamination": contamination
+        "contamination": contamination,
     }
 
 
@@ -471,12 +479,14 @@ def run_linear_regression(
 
     r_squared = model.score(X, y)
 
-    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_, strict=False)}
+    coefficients = {
+        feat: float(coef) for feat, coef in zip(features, model.coef_, strict=False)
+    }
     coefficients["intercept"] = float(model.intercept_)
 
     y_pred = model.predict(X)
     residuals = y - y_pred
-    rmse = float(np.sqrt(np.mean(residuals ** 2)))
+    rmse = float(np.sqrt(np.mean(residuals**2)))
     mae = float(np.mean(np.abs(residuals)))
 
     return {
@@ -487,7 +497,7 @@ def run_linear_regression(
         "mae": mae,
         "n_samples": len(data),
         "features_used": features,
-        "target": target
+        "target": target,
     }
 
 
@@ -533,7 +543,9 @@ def run_logistic_regression(
     y_pred = model.predict(X)
     accuracy = float(np.mean(y_pred == y))
 
-    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_[0], strict=False)}
+    coefficients = {
+        feat: float(coef) for feat, coef in zip(features, model.coef_[0], strict=False)
+    }
     coefficients["intercept"] = float(model.intercept_[0])
 
     return {
@@ -543,7 +555,7 @@ def run_logistic_regression(
         "n_samples": len(data),
         "features_used": features,
         "target": target,
-        "classes": le.classes_.tolist()
+        "classes": le.classes_.tolist(),
     }
 
 
@@ -581,9 +593,7 @@ def run_prophet_forecast(
         return {"error": "Insufficient data for forecasting"}
 
     model = Prophet(
-        yearly_seasonality="auto",
-        weekly_seasonality=False,
-        daily_seasonality=False
+        yearly_seasonality="auto", weekly_seasonality=False, daily_seasonality=False
     )
     model.fit(prophet_df)
 
@@ -591,7 +601,11 @@ def run_prophet_forecast(
     forecast = model.predict(future)
 
     historical = prophet_df[["ds", "y"]].to_dict(orient="records")
-    predictions = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(periods).to_dict(orient="records")
+    predictions = (
+        forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+        .tail(periods)
+        .to_dict(orient="records")
+    )
 
     return {
         "success": True,
@@ -599,12 +613,15 @@ def run_prophet_forecast(
         "forecast": predictions,
         "periods": periods,
         "date_column": date_col,
-        "value_column": value_col
+        "value_column": value_col,
     }
 
 
 def run_batch_report(
-    df: pd.DataFrame, slice_column: str, analysis_types: list[str], filters: list[dict] = None
+    df: pd.DataFrame,
+    slice_column: str,
+    analysis_types: list[str],
+    filters: list[dict] = None,
 ) -> list[dict[str, Any]]:
     """
     Generate batch reports for each group in a slice column.
@@ -634,7 +651,7 @@ def run_batch_report(
         report = {
             "group_value": str(group_val),
             "n_rows": int(len(group_df)),
-            "analyses": {}
+            "analyses": {},
         }
 
         for atype in analysis_types:
@@ -643,7 +660,7 @@ def run_batch_report(
                 if len(num_cols) > 0:
                     report["analyses"]["diagnostic"] = {
                         "n_numeric": len(num_cols),
-                        "mean_values": group_df[num_cols].mean().to_dict()
+                        "mean_values": group_df[num_cols].mean().to_dict(),
                     }
 
             elif atype == "correlation":
@@ -660,7 +677,7 @@ def run_batch_report(
                     summary = group_df[target_col].describe().to_dict()
                     report["analyses"]["groupby"] = {
                         "target": target_col,
-                        "summary": summary
+                        "summary": summary,
                     }
 
             elif atype == "outliers":
@@ -676,4 +693,3 @@ def run_batch_report(
         reports.append(report)
 
     return reports
-

@@ -112,7 +112,9 @@ class ReliabilityScorer:
         normalized_rerank = min(max(rerank_score, 0.0), 1.0) * self.rerank_weight
 
         # 4. Confidence weight
-        normalized_confidence = min(max(llm_confidence, 0.0), 1.0) * self.confidence_weight
+        normalized_confidence = (
+            min(max(llm_confidence, 0.0), 1.0) * self.confidence_weight
+        )
 
         # 5. Recency weight
         recency_contribution = self.recency_weight if is_recent else 0.0

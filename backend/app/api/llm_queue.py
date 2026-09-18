@@ -19,6 +19,8 @@ class QueueStatusResponse(BaseModel):
     your_position: int | None
     your_wait_time: float | None
     estimated_wait_seconds: float
+    # 前端 llm-queue-status 元件使用的欄位
+    is_available: bool
 
 
 class FullQueueStatus(BaseModel):
@@ -58,6 +60,10 @@ def get_queue_status(
         "your_position": user_position,
         "your_wait_time": user_wait_time,
         "estimated_wait_seconds": estimated_wait,
+        "is_available": (
+            status["active_count"] < status["max_concurrent"]
+            and status["queue_length"] == 0
+        ),
     }
 
 

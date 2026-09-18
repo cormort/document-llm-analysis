@@ -5,6 +5,7 @@ from pathlib import Path
 import structlog
 from docx import Document
 from pypdf import PdfReader
+from starlette.concurrency import run_in_threadpool
 
 from app.utils.excel_processor import smart_read_excel
 from app.utils.file_resolver import is_within_allowed_roots
@@ -26,6 +27,9 @@ class DocumentExtractionService:
 
         這是所有檔案內容進到 LLM 的最後一道關卡，因此在服務邊界再做一次
         資料目錄檢查（API 層若忘了驗證，這裡仍會擋下來）。
+
+        解析 PDF / Word / Excel 是阻塞式 CPU/IO 工作（pypdf、python-docx、
+        openpyxl、pdfplumber），一律丟到 thread pool，避免卡住 event loop。
         """
         if not allow_outside_data_dir and not is_within_allowed_roots(Path(file_path)):
             logger.warning("Blocked extraction outside data dir", file_path=file_path)
@@ -34,18 +38,28 @@ class DocumentExtractionService:
         ext = os.path.splitext(file_path)[1].lower()
         try:
             if ext == ".pdf":
-                return self._extract_pdf(file_path, start_page, end_page)
+                return await run_in_threadpool(
+                    self._extract_pdf, file_path, start_page, end_page
+                )
             elif ext in [".docx", ".doc"]:
-                return self._extract_word(file_path)
+                return await run_in_threadpool(self._extract_word, file_path)
             elif ext in [".xlsx", ".xls", ".csv"]:
-                return self._extract_excel(file_path)
+                return await run_in_threadpool(self._extract_excel, file_path)
             elif ext == ".json":
-                with open(file_path, encoding="utf-8") as f:
-                    data = json.load(f)
-                return json.dumps(data, ensure_ascii=False, indent=2)
+
+                def _read_json() -> str:
+                    with open(file_path, encoding="utf-8") as f:
+                        data = json.load(f)
+                    return json.dumps(data, ensure_ascii=False, indent=2)
+
+                return await run_in_threadpool(_read_json)
             elif ext in [".txt", ".md", ".py", ".js", ".html"]:
-                with open(file_path, encoding="utf-8") as f:
-                    return f.read()
+
+                def _read_text() -> str:
+                    with open(file_path, encoding="utf-8") as f:
+                        return f.read()
+
+                return await run_in_threadpool(_read_text)
             else:
                 return f"[Unsupported file format: {ext}]"
         except Exception as e:

@@ -91,7 +91,13 @@ class LLMProviders:
 
         # For OpenAI-compatible providers
         async for chunk in self._stream_openai_compatible(
-            provider, model_name, local_url, api_key_input, system_prompt, user_prompt, **kwargs
+            provider,
+            model_name,
+            local_url,
+            api_key_input,
+            system_prompt,
+            user_prompt,
+            **kwargs,
         ):
             yield chunk
 
@@ -446,7 +452,7 @@ class LLMProviders:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": kwargs.get("temperature", 0.7),
-            "stream": True
+            "stream": True,
         }
 
         try:
@@ -458,7 +464,7 @@ class LLMProviders:
                 headers=headers,
                 json=payload,
                 stream=True,
-                timeout=kwargs.get("timeout", 900)
+                timeout=kwargs.get("timeout", 900),
             )
             response.raise_for_status()
 
@@ -471,7 +477,11 @@ class LLMProviders:
                             break
                         try:
                             data = json.loads(data_str)
-                            content = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            content = (
+                                data.get("choices", [{}])[0]
+                                .get("delta", {})
+                                .get("content", "")
+                            )
                             if content:
                                 yield content
                         except Exception:

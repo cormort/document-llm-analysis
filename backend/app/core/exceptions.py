@@ -64,9 +64,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     """註冊全域例外處理器到 FastAPI app。"""
 
     @app.exception_handler(AppError)
-    async def app_exception_handler(
-        request: Request, exc: AppError
-    ) -> JSONResponse:
+    async def app_exception_handler(request: Request, exc: AppError) -> JSONResponse:
         logger.warning(
             "AppException: code=%s message=%s path=%s",
             exc.code,
@@ -86,9 +84,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def unhandled_exception_handler(
         request: Request, exc: Exception
     ) -> JSONResponse:
-        logger.exception(
-            "Unhandled exception: path=%s", request.url.path
-        )
+        logger.exception("Unhandled exception: path=%s", request.url.path)
         return JSONResponse(
             status_code=500,
             content={

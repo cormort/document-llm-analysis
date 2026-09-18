@@ -48,14 +48,14 @@ class SemanticChunker:
         # or use a capturing group and reassemble.
         pattern = r'([。！？.!?]["\'）\)]?\s*)'
         parts = re.split(pattern, text)
-        
+
         # Reassemble: parts will be [text, punct, text, punct, ...]
         sentences = []
         for i in range(0, len(parts) - 1, 2):
-            sentences.append(parts[i] + parts[i+1])
+            sentences.append(parts[i] + parts[i + 1])
         if len(parts) % 2 == 1 and parts[-1]:
             sentences.append(parts[-1])
-            
+
         return [s.strip() for s in sentences if s.strip()]
 
     def chunk(self, text: str) -> list[str]:

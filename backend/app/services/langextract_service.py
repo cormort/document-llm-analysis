@@ -76,7 +76,10 @@ class LangExtractService:
 
             self._lx = lx
             self._available = True
-            logger.info("LangExtract 模組載入成功", version=getattr(lx, "__version__", "unknown"))
+            logger.info(
+                "LangExtract 模組載入成功",
+                version=getattr(lx, "__version__", "unknown"),
+            )
         except ImportError as e:
             logger.warning("LangExtract 模組未安裝", error=str(e))
             self._available = False
@@ -133,7 +136,9 @@ class LangExtractService:
         lx = self._lx
 
         # 選擇範本或使用自訂設定
-        template = EXTRACTION_TEMPLATES.get(extraction_type, EXTRACTION_TEMPLATES["key_facts"])
+        template = EXTRACTION_TEMPLATES.get(
+            extraction_type, EXTRACTION_TEMPLATES["key_facts"]
+        )
         prompt = custom_prompt if custom_prompt else template["prompt"]
         classes = custom_classes if custom_classes else template["classes"]
 
@@ -183,7 +188,9 @@ class LangExtractService:
                 "extractions": extractions,
                 "html_visualization": html_content,
                 "total_count": len(extractions),
-                "classes_found": list({e.get("class") for e in extractions if e.get("class")}),
+                "classes_found": list(
+                    {e.get("class") for e in extractions if e.get("class")}
+                ),
             }
 
         except Exception as e:
@@ -218,7 +225,9 @@ class LangExtractService:
 
         # 本地 LLM (LM Studio / Ollama / etc.)
         # 使用 OpenAI-compatible 端點，但需要 fence_output
-        if any(p in provider for p in ["Local", "LM Studio", "Ollama", "Osaurus", "Exo"]):
+        if any(
+            p in provider for p in ["Local", "LM Studio", "Ollama", "Osaurus", "Exo"]
+        ):
             model_id = model_name or "qwen2.5:7b"
             # 本地 LLM 通常使用 Ollama 端點格式
             model_url = local_url.replace("/v1", "").rstrip("/")
@@ -255,7 +264,7 @@ class LangExtractService:
         return [
             lx.data.ExampleData(
                 text=example_text,
-                extractions=example_extractions[:len(classes)],  # 限制範例數量
+                extractions=example_extractions[: len(classes)],  # 限制範例數量
             )
         ]
 
@@ -298,10 +307,16 @@ class LangExtractService:
                 # 先儲存到臨時檔案
                 import tempfile
 
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".jsonl", delete=False
+                ) as f:
                     temp_path = f.name
                     if hasattr(result, "extractions"):
-                        lx.io.save_annotated_documents([result], output_name=os.path.basename(temp_path), output_dir=os.path.dirname(temp_path))
+                        lx.io.save_annotated_documents(
+                            [result],
+                            output_name=os.path.basename(temp_path),
+                            output_dir=os.path.dirname(temp_path),
+                        )
 
                     # 產生 HTML
                     html_content = lx.visualize(temp_path)
@@ -358,7 +373,9 @@ class LangExtractService:
             cls = ext.get("class", "unknown")
             text = ext.get("text", "")
             attrs = ext.get("attributes", {})
-            attrs_str = ", ".join(f"{k}: {v}" for k, v in attrs.items()) if attrs else ""
+            attrs_str = (
+                ", ".join(f"{k}: {v}" for k, v in attrs.items()) if attrs else ""
+            )
 
             html_parts.append(
                 f"<div class='extraction class-{cls}'>"
@@ -370,10 +387,14 @@ class LangExtractService:
 
         # 標記原文中的提取項目
         highlighted_text = original_text
-        for ext in sorted(extractions, key=lambda x: len(x.get("text", "")), reverse=True):
+        for ext in sorted(
+            extractions, key=lambda x: len(x.get("text", "")), reverse=True
+        ):
             text = ext.get("text", "")
             if text and text in highlighted_text:
-                highlighted_text = highlighted_text.replace(text, f"<mark>{text}</mark>", 1)
+                highlighted_text = highlighted_text.replace(
+                    text, f"<mark>{text}</mark>", 1
+                )
 
         html_parts.extend(
             [

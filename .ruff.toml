@@ -3,5 +3,6 @@ target-version = "py312"
 
 [lint]
 select = ["E", "F", "I", "N", "UP", "B"]
-# 見 backend/pyproject.toml 的說明（E501 長中文訊息、N806 數值慣例、UP042 行為差異）
+# 見 backend/pyproject.toml 的說明。程式碼已套用 ruff format；
+# E501 剩下的都是長中文 prompt 字串，N806 是數值運算慣例，UP042 會改變 str() 行為。
 ignore = ["E501", "N806", "UP042"]

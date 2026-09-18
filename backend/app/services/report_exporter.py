@@ -12,12 +12,12 @@ import markdown
 
 def generate_docx_report(title: str, content: str, output_path: str) -> str:
     """Generate a Word (.docx) report from markdown content.
-    
+
     Args:
         title: Report title
         content: Markdown-formatted report content
         output_path: Path where the .docx file should be saved
-    
+
     Returns:
         The output_path of the generated file
     """
@@ -103,12 +103,12 @@ def _add_inline_markdown(para, text: str) -> None:
 
 def generate_html_report(title: str, content: str, chart_html: str = None) -> str:
     """Generate a styled HTML report from markdown content."""
-    
+
     # Convert markdown to HTML
-    html_content = markdown.markdown(content, extensions=['tables', 'fenced_code'])
-    
+    html_content = markdown.markdown(content, extensions=["tables", "fenced_code"])
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
+
     html_template = f"""
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -298,7 +298,7 @@ def generate_html_report(title: str, content: str, chart_html: str = None) -> st
         </div>
         
         <div class="content">
-            {f'<div class="chart-container">{chart_html}</div>' if chart_html else ''}
+            {f'<div class="chart-container">{chart_html}</div>' if chart_html else ""}
             {html_content}
         </div>
         
@@ -315,7 +315,7 @@ def generate_html_report(title: str, content: str, chart_html: str = None) -> st
 def generate_markdown_report(title: str, content: str) -> str:
     """Generate a markdown report."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
+
     md_template = f"""# 📊 {title}
 
 > 生成時間：{timestamp}
@@ -336,9 +336,9 @@ def save_report(content: str, filename: str, folder: str = "reports") -> str:
     """Save report to file and return the path."""
     if not os.path.exists(folder):
         os.makedirs(folder)
-    
+
     filepath = os.path.join(folder, filename)
-    with open(filepath, 'w', encoding='utf-8') as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         f.write(content)
-    
+
     return filepath

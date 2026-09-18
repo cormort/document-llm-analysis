@@ -23,7 +23,7 @@ FORBIDDEN_PATTERNS = [
     r"\beval\s*\(",
     r"\bexec\s*\(",
     r"\bcompile\s*\(",
-    r"\bopen\s*\(",    # 原本寫成 r"\bopen\s*([\"']"，括號未跳脫＝無效正則
+    r"\bopen\s*\(",  # 原本寫成 r"\bopen\s*([\"']"，括號未跳脫＝無效正則
     r"\.system\s*\(",
     r"\.popen\s*\(",
     r"\.spawn\s*\(",

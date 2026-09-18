@@ -21,7 +21,7 @@ interface LLMQueueStatusProps {
 export function LLMQueueStatus({ onStatusChange }: LLMQueueStatusProps) {
   const [status, setStatus] = useState<QueueStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -113,7 +113,7 @@ export function LLMQueueStatus({ onStatusChange }: LLMQueueStatusProps) {
 
 export function LLMQueueBanner() {
   const [status, setStatus] = useState<QueueStatus | null>(null);
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated) return;

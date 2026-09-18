@@ -94,7 +94,8 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
     const [input, setInput] = useState("");
     const scrollRef = useRef<HTMLDivElement>(null);
-    const { messages, isStreaming } = useChatStore();
+    const messages = useChatStore((s) => s.messages);
+    const isStreaming = useChatStore((s) => s.isStreaming);
     const { sendMessage } = useChat({
         selectedDocuments,
         useHybrid,

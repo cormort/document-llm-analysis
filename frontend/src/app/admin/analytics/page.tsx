@@ -30,7 +30,7 @@ export default function AnalyticsPage() {
   const [events, setEvents] = useState<EventDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [days, setDays] = useState(7);
-  const { user: currentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.user);
   const { trackClick } = useAnalytics();
 
   useEffect(() => {

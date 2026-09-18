@@ -31,7 +31,7 @@ interface DashboardStats {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { trackClick } = useAnalytics();
 
   useEffect(() => {

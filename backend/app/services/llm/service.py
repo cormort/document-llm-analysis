@@ -88,6 +88,16 @@ class LLMService:
     # ==========================================
     # Provider Logic & Routing
     # ==========================================
+    def _resolve_api_key(self, provider: str, client_api_key: str | None) -> str | None:
+        """決定這次呼叫要用的 API Key。
+
+        `ALLOW_CLIENT_API_KEYS=false` 時忽略前端傳來的金鑰，只使用伺服器
+        設定的金鑰（避免金鑰在瀏覽器／網路上流動）。
+        """
+        if client_api_key and settings.ALLOW_CLIENT_API_KEYS:
+            return client_api_key
+        return self._get_api_key_for_provider(provider)
+
     def _get_api_key_for_provider(self, provider: str) -> str | None:
         """Return the appropriate API key for a given provider."""
         if provider == "Gemini":
@@ -271,7 +281,7 @@ class LLMService:
             financial_skepticism=financial_skepticism,
         )
 
-        api_key_input = api_key or self._get_api_key_for_provider(provider)
+        api_key_input = self._resolve_api_key(provider, api_key)
 
         return await self._call_provider(
             provider,
@@ -528,7 +538,7 @@ class LLMService:
 
 請生成 Pandas 程式碼："""
 
-        api_key = kwargs.pop("api_key", None) or self._get_api_key_for_provider(provider)
+        api_key = self._resolve_api_key(provider, kwargs.pop("api_key", None))
         return await self._call_provider(
             provider,
             model_name,
@@ -558,7 +568,7 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        api_key_input = api_key or self._get_api_key_for_provider(provider)
+        api_key_input = self._resolve_api_key(provider, api_key)
 
         system_prompt = """你是一位專業的文件分析助手。請根據提供的上下文內容回答問題。
 
@@ -605,7 +615,7 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        api_key_input = api_key or self._get_api_key_for_provider(provider)
+        api_key_input = self._resolve_api_key(provider, api_key)
 
         system_prompt = """你是一位專業的文件分析助手。請根據提供的上下文內容回答問題。
 

@@ -134,14 +134,18 @@ class AstuteRAGService:
             result = result.strip()
             if result.startswith("```"):
                 lines = result.split("\n")
-                result = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                result = "\n".join(
+                    lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+                )
 
             parsed = json.loads(result)
 
             # Determine if retrieval is needed
             confidence = float(parsed.get("confidence", 0.5))
             knowledge_gaps = parsed.get("knowledge_gaps", [])
-            needs_retrieval = confidence < self.internal_threshold or len(knowledge_gaps) > 0
+            needs_retrieval = (
+                confidence < self.internal_threshold or len(knowledge_gaps) > 0
+            )
 
             return {
                 "internal_answer": parsed.get("internal_answer", ""),
@@ -193,8 +197,16 @@ class AstuteRAGService:
         """
         # Check for document-specific queries
         doc_indicators = [
-            "根據文件", "文件中", "報告裡", "按照", "依據",
-            "這份", "該文", "此文件", "上述", "如附件"
+            "根據文件",
+            "文件中",
+            "報告裡",
+            "按照",
+            "依據",
+            "這份",
+            "該文",
+            "此文件",
+            "上述",
+            "如附件",
         ]
         is_doc_specific = any(ind in query for ind in doc_indicators)
 
@@ -274,12 +286,14 @@ class AstuteRAGService:
         # Build conflict notes
         conflict_notes = []
         for c in conflicts:
-            conflict_notes.append({
-                "type": c.get("conflict_type", "unknown"),
-                "description": c.get("description", ""),
-                "internal": c.get("internal", "")[:100],
-                "external": c.get("external", "")[:100],
-            })
+            conflict_notes.append(
+                {
+                    "type": c.get("conflict_type", "unknown"),
+                    "description": c.get("description", ""),
+                    "internal": c.get("internal", "")[:100],
+                    "external": c.get("external", "")[:100],
+                }
+            )
 
         # Generate answer
         answer_prompt = f"""基於以下經過驗證和評分的資訊回答問題。
@@ -312,7 +326,9 @@ class AstuteRAGService:
             reliability_dist = consolidated.get("reliability_distribution", {})
             high_count = reliability_dist.get("high", 0)
             total = consolidated.get("total_facts", 1)
-            confidence = min((high_count / max(total, 1)) * 1.2, 1.0)  # Boost for high reliability
+            confidence = min(
+                (high_count / max(total, 1)) * 1.2, 1.0
+            )  # Boost for high reliability
 
             # Adjust confidence based on conflicts
             if conflicts:
@@ -321,17 +337,21 @@ class AstuteRAGService:
             # Compile sources used
             sources_used = []
             for fact in consolidated.get("consistent_facts", []):
-                sources_used.append({
-                    "text": fact.get("text", "")[:100],
-                    "type": "consistent",
-                    "reliability": fact.get("reliability_score", 0),
-                })
+                sources_used.append(
+                    {
+                        "text": fact.get("text", "")[:100],
+                        "type": "consistent",
+                        "reliability": fact.get("reliability_score", 0),
+                    }
+                )
             for fact in consolidated.get("external_only", [])[:3]:
-                sources_used.append({
-                    "text": fact.get("text", "")[:100],
-                    "type": "external",
-                    "reliability": fact.get("reliability_score", 0),
-                })
+                sources_used.append(
+                    {
+                        "text": fact.get("text", "")[:100],
+                        "type": "external",
+                        "reliability": fact.get("reliability_score", 0),
+                    }
+                )
 
             return {
                 "answer": answer,

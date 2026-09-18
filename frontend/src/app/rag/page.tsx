@@ -34,7 +34,10 @@ type TabType = "chat" | "data";
 
 export default function RAGPage() {
     // Global document store
-    const { documents, loading, error, fetchDocuments } = useDocumentStore();
+    const documents = useDocumentStore((s) => s.documents);
+    const loading = useDocumentStore((s) => s.loading);
+    const error = useDocumentStore((s) => s.error);
+    const fetchDocuments = useDocumentStore((s) => s.fetchDocuments);
     
     const [activeTab, setActiveTab] = useState<TabType>("chat");
     const [reindexing, setReindexing] = useState<Set<string>>(new Set());

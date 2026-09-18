@@ -19,6 +19,7 @@ router = APIRouter()
 
 EXECUTION_TIMEOUT_SECONDS = 10
 
+
 @router.post("/execute", response_model=QueryExecuteResponse)
 async def execute_query(request: QueryExecuteRequest) -> QueryExecuteResponse:
     """Execute generated Pandas code on a local file with safety checks."""

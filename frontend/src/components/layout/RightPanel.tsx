@@ -10,7 +10,8 @@ import { listDocuments, DocumentInfo } from "@/lib/api";
 export function RightPanel() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const { selectedDocuments, toggleDocumentSelection } = useAppStore();
+  const selectedDocuments = useAppStore((s) => s.selectedDocuments);
+  const toggleDocumentSelection = useAppStore((s) => s.toggleDocumentSelection);
 
   useEffect(() => {
     async function fetchDocuments() {

@@ -66,7 +66,6 @@ async def generate_report(request: ReportGenerateRequest) -> ReportResponse:
     """Generate a professional report using LLM and Agent Skills."""
     try:
         logger.info("Report Generation Started", template=request.template_name)
-        
 
         selected_skill_objs = get_skills_by_ids(request.selected_skills)
         skills_text = "\n".join([s.prompt_fragment for s in selected_skill_objs])
@@ -146,7 +145,9 @@ async def download_report_docx(request: dict, background_tasks: BackgroundTasks)
         temp_file.close()
 
         # Generate docx
-        await run_in_threadpool(generate_docx_report(title, content, output_path=temp_path))
+        await run_in_threadpool(
+            generate_docx_report(title, content, output_path=temp_path)
+        )
 
         # Clean up temporary file after sending
         background_tasks.add_task(os.unlink, temp_path)

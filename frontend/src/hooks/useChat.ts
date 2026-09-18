@@ -35,7 +35,10 @@ export function useChat(options: UseChatOptions = {}) {
 
     const { addMessage, updateLastMessage, appendToLastMessage, setStreaming, isStreaming } =
         useChatStore();
-    const { provider, model_name, local_url, api_key } = useSettingsStore();
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
 
     const sendMessage = useCallback(
         async (question: string) => {

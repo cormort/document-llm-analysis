@@ -135,7 +135,7 @@ class RAGIndexerMixin:
                 documents=chunks,
                 metadatas=metadatas,
             )
-            self.collection = collection
+            self.default_collection = collection
 
             # Build Knowledge Graph
             if build_graph:
@@ -245,8 +245,11 @@ class RAGIndexerMixin:
             return False
         try:
             self.client.delete_collection(collection_name)
-            if self.collection and self.collection.name == collection_name:
-                self.collection = None
+            if (
+                self.default_collection
+                and self.default_collection.name == collection_name
+            ):
+                self.default_collection = None
             return True
         except Exception as e:
             logger.error(f"Delete collection {collection_name} failed", error=str(e))
@@ -285,7 +288,11 @@ class RAGIndexerMixin:
                     )
                     if not all_docs or not all_docs["documents"]:
                         results.append(
-                            {"collection": col_name, "status": "skipped", "reason": "empty"}
+                            {
+                                "collection": col_name,
+                                "status": "skipped",
+                                "reason": "empty",
+                            }
                         )
                         continue
 
@@ -349,7 +356,9 @@ class RAGIndexerMixin:
         if not self._lazy_init():
             return False
         try:
-            self.collection = self.client.get_collection(collection_name)
+            # switch_to_document 是同步方法（由 sync 呼叫端使用），
+            # 這裡維持同步取得 collection 物件。
+            self.default_collection = self.client.get_collection(collection_name)
             return True
         except Exception as e:
             logger.error(f"Switch to {collection_name} failed", error=str(e))

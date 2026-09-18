@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     # Upload
     MAX_UPLOAD_SIZE_MB: int = 50
 
+    # 是否接受前端傳來的 API Key。
+    # 設為 false 時只使用伺服器端設定（GOOGLE_API_KEY / OMLX_API_KEY），
+    # 適合單一組織內部部署，避免金鑰在瀏覽器與網路間流動。
+    ALLOW_CLIENT_API_KEYS: bool = True
+
     # /metrics 是否要求認證（Prometheus 需帶 token；純內網可設 false）
     METRICS_REQUIRE_AUTH: bool = True
 

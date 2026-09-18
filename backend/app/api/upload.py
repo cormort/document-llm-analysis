@@ -69,7 +69,6 @@ BLOCKED_MIME_TYPES: set[str] = {
 }
 
 
-
 class UploadResponse(BaseModel):
     """上傳回應模型。"""
 
@@ -112,9 +111,7 @@ async def _validate_file_size(file: UploadFile) -> bytes:
         total += len(chunk)
         if total > MAX_UPLOAD_SIZE:
             raise FileValidationError(
-                message=(
-                    f"檔案大小超過限制 ({settings.MAX_UPLOAD_SIZE_MB}MB)"
-                ),
+                message=(f"檔案大小超過限制 ({settings.MAX_UPLOAD_SIZE_MB}MB)"),
                 detail={
                     "file_size_bytes": total,
                     "max_size_bytes": MAX_UPLOAD_SIZE,
@@ -197,4 +194,3 @@ async def upload_file(file: UploadFile = File()) -> UploadResponse:  # noqa: B00
         file_path=file_path,
         message=f"成功上傳 {safe_filename}",
     )
-

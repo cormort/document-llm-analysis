@@ -13,6 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api import (
+    admin_system,
     agent,
     analytics,
     auth,
@@ -67,9 +68,7 @@ register_exception_handlers(app)
 Instrumentator().instrument(app)
 
 
-_metrics_dependencies = (
-    [Depends(require_auth)] if settings.METRICS_REQUIRE_AUTH else []
-)
+_metrics_dependencies = [Depends(require_auth)] if settings.METRICS_REQUIRE_AUTH else []
 
 
 @app.get("/metrics", include_in_schema=False, dependencies=_metrics_dependencies)
@@ -80,6 +79,7 @@ def metrics_endpoint() -> Response:
     （可透過 METRICS_REQUIRE_AUTH=false 讓內網 scraper 免認證）。
     """
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 cors_origins: list[str] = (
     [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
@@ -190,3 +190,10 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(ip_control.router, prefix="/api/admin/ip", tags=["IP Control"])
+# 管理員專用的系統資訊（/admin/settings 頁面顯示真實設定）
+app.include_router(
+    admin_system.router,
+    prefix="/api/admin",
+    tags=["Admin"],
+    dependencies=[Depends(get_current_admin_user)],
+)

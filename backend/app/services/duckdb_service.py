@@ -52,7 +52,6 @@ def quote_identifier(name: str) -> str:
     return f'"{sanitize_identifier(name)}"'
 
 
-
 class DuckDBService:
     """Service for DuckDB-based data operations."""
 
@@ -170,7 +169,6 @@ class DuckDBService:
         if "read_" in sql.lower() or "glob(" in sql.lower():
             raise ValueError("查詢不可直接存取外部檔案")
 
-
     def get_table_schema(self, table_name: str) -> list[dict[str, Any]]:
         """
         Get schema information for a table.
@@ -182,7 +180,9 @@ class DuckDBService:
             List of column info dicts with 'name', 'type', 'nullable'
         """
         try:
-            result = self.conn.execute(f"DESCRIBE {quote_identifier(table_name)}").fetchdf()
+            result = self.conn.execute(
+                f"DESCRIBE {quote_identifier(table_name)}"
+            ).fetchdf()
             return result.to_dict(orient="records")
         except Exception as e:
             logger.error(f"Failed to get schema for {table_name}: {e}")

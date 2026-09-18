@@ -1,12 +1,44 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ProfilingTab } from "@/components/stats/ProfilingTab";
-import { DataPrepTab } from "@/components/stats/DataPrepTab";
-import { ExploratoryTab } from "@/components/stats/ExploratoryTab";
-import { InferenceTab } from "@/components/stats/InferenceTab";
-import { MultivariateTab } from "@/components/stats/MultivariateTab";
-import { ModelingTab } from "@/components/stats/ModelingTab";
+import dynamic from "next/dynamic";
+
+/**
+ * 六個分析分頁各自帶著 recharts / plotly 等大型圖表依賴。
+ * 全部靜態載入會讓 /stats 首屏背上整包圖表程式庫；改成按需載入後，
+ * 只有使用者真的切到該分頁才會下載對應 chunk。
+ */
+const tabLoading = () => (
+    <div className="flex items-center justify-center py-16 text-slate-400">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        載入分析模組…
+    </div>
+);
+
+const ProfilingTab = dynamic(
+    () => import("@/components/stats/ProfilingTab").then((m) => m.ProfilingTab),
+    { loading: tabLoading }
+);
+const DataPrepTab = dynamic(
+    () => import("@/components/stats/DataPrepTab").then((m) => m.DataPrepTab),
+    { loading: tabLoading }
+);
+const ExploratoryTab = dynamic(
+    () => import("@/components/stats/ExploratoryTab").then((m) => m.ExploratoryTab),
+    { loading: tabLoading }
+);
+const InferenceTab = dynamic(
+    () => import("@/components/stats/InferenceTab").then((m) => m.InferenceTab),
+    { loading: tabLoading }
+);
+const MultivariateTab = dynamic(
+    () => import("@/components/stats/MultivariateTab").then((m) => m.MultivariateTab),
+    { loading: tabLoading }
+);
+const ModelingTab = dynamic(
+    () => import("@/components/stats/ModelingTab").then((m) => m.ModelingTab),
+    { loading: tabLoading }
+);
 import { CommandCenter } from "@/components/ui/command-center";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -40,10 +72,17 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useDataFileStore } from "@/stores/data-file-store";
 
 export default function StatisticsPage() {
-    const { provider, model_name, local_url, api_key } = useSettingsStore();
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
     const config = { provider, model_name, local_url, api_key };
 
-    const { files, loading: loadingDocs, fetchFiles } = useDataFileStore();
+    const files = useDataFileStore((s) => s.files);
+
+    const loadingDocs = useDataFileStore((s) => s.loading);
+
+    const fetchFiles = useDataFileStore((s) => s.fetchFiles);
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState("profiling");

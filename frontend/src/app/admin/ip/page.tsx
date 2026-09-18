@@ -45,7 +45,7 @@ export default function IPManagementPage() {
   const [newDescription, setNewDescription] = useState("");
   const [newReason, setNewReason] = useState("");
   const [expiresDays, setExpiresDays] = useState("");
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { trackClick } = useAnalytics();
 
   useEffect(() => {

@@ -9,7 +9,10 @@ const publicPaths = ["/login", "/register"];
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading, user, hydrate } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const user = useAuthStore((s) => s.user);
+  const hydrate = useAuthStore((s) => s.hydrate);
 
   useEffect(() => {
     hydrate();

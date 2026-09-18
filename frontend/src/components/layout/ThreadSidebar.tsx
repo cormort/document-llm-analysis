@@ -6,7 +6,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 
 export function ThreadSidebar() {
-  const { threads, currentThreadId, createThread, selectThread, deleteThread } = useAppStore();
+  const threads = useAppStore((s) => s.threads);
+  const currentThreadId = useAppStore((s) => s.currentThreadId);
+  const createThread = useAppStore((s) => s.createThread);
+  const selectThread = useAppStore((s) => s.selectThread);
+  const deleteThread = useAppStore((s) => s.deleteThread);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 border-r border-slate-200">

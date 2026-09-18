@@ -79,7 +79,9 @@ class KnowledgeConsolidator:
         # Format retrieved passages for comparison
         external_contents = [p.get("content", "") for p in retrieved_passages]
         external_metadata = [p.get("metadata", {}) for p in retrieved_passages]
-        external_scores = [p.get("rerank_score", p.get("score", 0.5)) for p in retrieved_passages]
+        external_scores = [
+            p.get("rerank_score", p.get("score", 0.5)) for p in retrieved_passages
+        ]
 
         # Use LLM to perform detailed consolidation
         consolidation_result = await self._llm_consolidate(
@@ -103,12 +105,14 @@ class KnowledgeConsolidator:
                 rerank_score=max(external_scores) if external_scores else 0.5,
                 source_metadata=external_metadata[0] if external_metadata else {},
             )
-            consistent_facts.append({
-                "text": fact,
-                "source_type": SourceType.BOTH.value,
-                "reliability_score": score.score,
-                "reliability_detail": score.explanation,
-            })
+            consistent_facts.append(
+                {
+                    "text": fact,
+                    "source_type": SourceType.BOTH.value,
+                    "reliability_score": score.score,
+                    "reliability_detail": score.explanation,
+                }
+            )
 
         conflicts = []
         for conflict in consolidation_result.get("conflicts", []):
@@ -116,13 +120,15 @@ class KnowledgeConsolidator:
                 internal_fact=conflict.get("internal", ""),
                 external_fact=conflict.get("external", ""),
             )
-            conflicts.append({
-                "internal": conflict.get("internal", ""),
-                "external": conflict.get("external", ""),
-                "conflict_type": conflict_type.value,
-                "severity": severity,
-                "description": conflict.get("description", ""),
-            })
+            conflicts.append(
+                {
+                    "internal": conflict.get("internal", ""),
+                    "external": conflict.get("external", ""),
+                    "conflict_type": conflict_type.value,
+                    "severity": severity,
+                    "description": conflict.get("description", ""),
+                }
+            )
 
         external_only = []
         for i, fact in enumerate(consolidation_result.get("external_only", [])):
@@ -135,12 +141,14 @@ class KnowledgeConsolidator:
                 rerank_score=ext_score,
                 source_metadata=meta,
             )
-            external_only.append({
-                "text": fact,
-                "source_type": SourceType.EXTERNAL.value,
-                "reliability_score": score.score,
-                "reliability_detail": score.explanation,
-            })
+            external_only.append(
+                {
+                    "text": fact,
+                    "source_type": SourceType.EXTERNAL.value,
+                    "reliability_score": score.score,
+                    "reliability_detail": score.explanation,
+                }
+            )
 
         internal_only = []
         for fact in consolidation_result.get("internal_only", []):
@@ -150,12 +158,14 @@ class KnowledgeConsolidator:
                 is_consistent=False,
                 llm_confidence=internal_confidence,
             )
-            internal_only.append({
-                "text": fact,
-                "source_type": SourceType.INTERNAL.value,
-                "reliability_score": score.score,
-                "reliability_detail": score.explanation,
-            })
+            internal_only.append(
+                {
+                    "text": fact,
+                    "source_type": SourceType.INTERNAL.value,
+                    "reliability_score": score.score,
+                    "reliability_detail": score.explanation,
+                }
+            )
 
         # Compute reliability distribution
         all_scores = (
@@ -176,7 +186,9 @@ class KnowledgeConsolidator:
             "external_only": external_only,
             "internal_only": internal_only,
             "consolidation_summary": consolidation_result.get("summary", ""),
-            "total_facts": len(consistent_facts) + len(external_only) + len(internal_only),
+            "total_facts": len(consistent_facts)
+            + len(external_only)
+            + len(internal_only),
             "reliability_distribution": reliability_distribution,
         }
 
@@ -191,9 +203,13 @@ class KnowledgeConsolidator:
         local_url: str | None = None,
     ) -> dict[str, Any]:
         """Use LLM to perform detailed knowledge consolidation."""
-        internal_facts_text = "\n".join(f"- {f}" for f in internal_facts) if internal_facts else "（無）"
+        internal_facts_text = (
+            "\n".join(f"- {f}" for f in internal_facts) if internal_facts else "（無）"
+        )
         external_text = "\n\n".join(
-            f"[文件 {i + 1}]\n{content[:500]}..." if len(content) > 500 else f"[文件 {i + 1}]\n{content}"
+            f"[文件 {i + 1}]\n{content[:500]}..."
+            if len(content) > 500
+            else f"[文件 {i + 1}]\n{content}"
             for i, content in enumerate(external_contents[:5])
         )
 
@@ -238,7 +254,9 @@ class KnowledgeConsolidator:
             result = result.strip()
             if result.startswith("```"):
                 lines = result.split("\n")
-                result = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                result = "\n".join(
+                    lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+                )
 
             return json.loads(result)
 
@@ -306,7 +324,9 @@ class KnowledgeConsolidator:
         # High reliability facts (consistent)
         consistent = consolidated.get("consistent_facts", [])
         if consistent:
-            reliable_consistent = [f for f in consistent if f.get("reliability_score", 0) >= 0.7]
+            reliable_consistent = [
+                f for f in consistent if f.get("reliability_score", 0) >= 0.7
+            ]
             if reliable_consistent:
                 parts.append("【高可靠性資訊（來源一致）】")
                 for f in reliable_consistent:
@@ -314,7 +334,9 @@ class KnowledgeConsolidator:
 
         # Medium reliability external facts
         external = consolidated.get("external_only", [])
-        reliable_external = [f for f in external if f.get("reliability_score", 0) >= min_reliability]
+        reliable_external = [
+            f for f in external if f.get("reliability_score", 0) >= min_reliability
+        ]
         if reliable_external:
             parts.append("\n【來自文件的資訊】")
             for f in reliable_external:
@@ -323,7 +345,9 @@ class KnowledgeConsolidator:
 
         # Internal knowledge (with caveat)
         internal = consolidated.get("internal_only", [])
-        reliable_internal = [f for f in internal if f.get("reliability_score", 0) >= min_reliability]
+        reliable_internal = [
+            f for f in internal if f.get("reliability_score", 0) >= min_reliability
+        ]
         if reliable_internal:
             parts.append("\n【來自背景知識（待驗證）】")
             for f in reliable_internal:

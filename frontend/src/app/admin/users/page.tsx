@@ -22,7 +22,7 @@ export default function UsersManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const { user: currentUser } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.user);
   const { trackClick } = useAnalytics();
 
   useEffect(() => {

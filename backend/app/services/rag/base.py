@@ -31,7 +31,10 @@ class RAGBase:
         self.persist_directory = persist_directory or os.path.join(
             DATA_DIR, "chroma_db"
         )
-        self.collection = None
+        # 「預設 collection」＝最近一次索引/切換的文件。查詢路徑不應該依賴它
+        # （見 RAGSearcherMixin._resolve_collection）；保留 `collection` 別名
+        # 只為向後相容。
+        self._default_collection = None
         self.embedder = None
         self.reranker = None
         self._initialized = False
@@ -39,6 +42,24 @@ class RAGBase:
         self._executor = ThreadPoolExecutor(max_workers=4)
         self.semantic_chunker = None
         self.context_compressor = None
+
+    @property
+    def default_collection(self):
+        """最近一次索引／切換到的 collection（僅作為 fallback）。"""
+        return self._default_collection
+
+    @default_collection.setter
+    def default_collection(self, value) -> None:
+        self._default_collection = value
+
+    @property
+    def collection(self):
+        """向後相容別名；新程式碼請用 `default_collection`。"""
+        return self._default_collection
+
+    @collection.setter
+    def collection(self, value) -> None:
+        self._default_collection = value
 
     async def _run_sync(self, func, *args, **kwargs):
         """Run a synchronous function in a thread pool."""

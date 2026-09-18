@@ -101,7 +101,6 @@ def resolve_data_file(
     return None
 
 
-
 def load_dataframe(file_path_str: str) -> pd.DataFrame | None:
     """載入資料檔案為 DataFrame。
 

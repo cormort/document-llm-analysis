@@ -180,9 +180,9 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
     interpretation = None
 
     if request.analysis_type == "correlation":
-        corr_matrix = await run_in_threadpool(run_correlation_matrix(
-            df, method=request.params.get("method", "pearson")
-        ))
+        corr_matrix = await run_in_threadpool(
+            run_correlation_matrix(df, method=request.params.get("method", "pearson"))
+        )
         result_data = corr_matrix.replace({np.nan: None}).to_dict()
 
         # Auto-interpret if requested
@@ -222,7 +222,9 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
                     api_key=request.config.api_key,
                 )
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=f"Column not found: {str(e)}") from e
+            raise HTTPException(
+                status_code=400, detail=f"Column not found: {str(e)}"
+            ) from e
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -275,7 +277,9 @@ async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
             raise HTTPException(
                 status_code=400, detail="Mann-Whitney U requires exactly 2 columns"
             )
-        test_results = await run_in_threadpool(run_mannwhitneyu(df[cols[0]], df[cols[1]]))
+        test_results = await run_in_threadpool(
+            run_mannwhitneyu(df[cols[0]], df[cols[1]])
+        )
 
     elif request.test_type == "kruskal":
         groups = [df[col] for col in cols]
@@ -310,14 +314,16 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
     interpretation = None
 
     if request.analysis_type == "pca":
-        res = await run_in_threadpool(run_pca(df, request.features, request.n_components))
+        res = await run_in_threadpool(
+            run_pca(df, request.features, request.n_components)
+        )
         if "error" in res:
             raise HTTPException(status_code=400, detail=res["error"])
-        
+
         result_data = res["data"]
         components_variance = res["explained_variance"]
         feature_weights = res["feature_weights"]
-        
+
         # LLM Interpretation
         prompt = f"""
 請解讀以下主成分分析 (PCA) 的結果：
@@ -327,7 +333,7 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
 各成分特徵權重：{feature_weights}
 
 請用繁體中文以專業數據分析師的角度，解釋前幾個主成分可能代表的業務意義，以及降維效果是否理想。
-"""     
+"""
         api_key = request.config.api_key
         interpretation = await llm_service.analyze_text(
             text_content=prompt,
@@ -339,13 +345,15 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
         )
 
     elif request.analysis_type == "kmeans":
-        res = await run_in_threadpool(run_kmeans(df, request.features, request.n_clusters))
+        res = await run_in_threadpool(
+            run_kmeans(df, request.features, request.n_clusters)
+        )
         if "error" in res:
             raise HTTPException(status_code=400, detail=res["error"])
-        
+
         result_data = res["data"]
         cluster_centers = res["cluster_centers"]
-        
+
         prompt = f"""
 請解讀以下 K-Means 集群分析的結果：
 使用特徵：{request.features}
@@ -364,7 +372,10 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
             api_key=api_key,
         )
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported multivariate analysis type: {request.analysis_type}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported multivariate analysis type: {request.analysis_type}",
+        )
 
     return MultivariateResponse(
         analysis_type=request.analysis_type,
@@ -517,7 +528,9 @@ async def transform_variable(request: TransformRequest) -> TransformResponse:
         import logging
 
         logging.exception("Transformation failed")
-        raise HTTPException(status_code=400, detail=f"Transformation failed: {str(e)}") from e
+        raise HTTPException(
+            status_code=400, detail=f"Transformation failed: {str(e)}"
+        ) from e
 
 
 @router.post("/data")
@@ -774,7 +787,9 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
     try:
         # Load file and get schema
         table_name = await run_in_threadpool(duckdb_service.load_file, str(file_path))
-        schema_desc = await run_in_threadpool(duckdb_service.generate_schema_description, table_name)
+        schema_desc = await run_in_threadpool(
+            duckdb_service.generate_schema_description, table_name
+        )
 
         # Generate SQL from natural language using LLM
         sql_prompt = f"""你是一位 SQL 專家。根據以下資料表結構，將使用者問題轉換為 DuckDB SQL 查詢。
@@ -825,6 +840,7 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
 
 class NLToSQLInterpretRequest(BaseModel):
     """Request for on-demand result interpretation."""
+
     question: str
     sql: str
     data_sample: list[dict[str, Any]]
@@ -871,7 +887,9 @@ async def get_sql_schema(file_path: str) -> dict:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {file_path}")
 
     try:
-        table_name = await run_in_threadpool(duckdb_service.load_file, str(resolved_path))
+        table_name = await run_in_threadpool(
+            duckdb_service.load_file, str(resolved_path)
+        )
         stats = await run_in_threadpool(duckdb_service.get_table_stats, table_name)
         sample = await run_in_threadpool(duckdb_service.get_table_sample, table_name, 5)
 
@@ -900,9 +918,7 @@ async def apply_column_filter(request: FilterRequest) -> FilterResponse:
     data = convert_numpy_types(filtered_df.head(200).to_dict(orient="records"))
 
     return FilterResponse(
-        filtered_data=data,
-        total_rows=len(filtered_df),
-        applied_filters=applied
+        filtered_data=data, total_rows=len(filtered_df), applied_filters=applied
     )
 
 
@@ -914,23 +930,27 @@ async def generate_batch_report(request: BatchReportRequest) -> BatchReportRespo
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     filters = [{"column": f.column, "values": f.values} for f in request.filters]
-    analysis_types = request.analysis_types or ["diagnostic", "correlation", "groupby", "outliers"]
+    analysis_types = request.analysis_types or [
+        "diagnostic",
+        "correlation",
+        "groupby",
+        "outliers",
+    ]
 
-    reports = await run_in_threadpool(run_batch_report(df, request.slice_column, analysis_types, filters))
+    reports = await run_in_threadpool(
+        run_batch_report(df, request.slice_column, analysis_types, filters)
+    )
 
     report_items = [
         ReportItem(
             group_value=r.get("group_value", ""),
             summary=f"共 {r.get('n_rows', 0)} 筆資料",
-            data=r
+            data=r,
         )
         for r in reports
     ]
 
-    return BatchReportResponse(
-        reports=report_items,
-        total_groups=len(report_items)
-    )
+    return BatchReportResponse(reports=report_items, total_groups=len(report_items))
 
 
 @router.post("/test/isolation-forest")
@@ -943,9 +963,13 @@ async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
 
-    contamination = request.params.get("contamination", 0.05) if request.params else 0.05
+    contamination = (
+        request.params.get("contamination", 0.05) if request.params else 0.05
+    )
 
-    result = await run_in_threadpool(run_isolation_forest(df, request.features, contamination))
+    result = await run_in_threadpool(
+        run_isolation_forest(df, request.features, contamination)
+    )
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -965,7 +989,9 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
 
     target = request.params.get("target") if request.params else None
     if not target:
-        raise HTTPException(status_code=400, detail="Target column not specified in params")
+        raise HTTPException(
+            status_code=400, detail="Target column not specified in params"
+        )
 
     # Use first numeric column as target if not specified
     if target not in df.columns:
@@ -973,9 +999,13 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
         if num_cols:
             target = num_cols[0]
         else:
-            raise HTTPException(status_code=400, detail="No numeric target column found")
+            raise HTTPException(
+                status_code=400, detail="No numeric target column found"
+            )
 
-    result = await run_in_threadpool(run_linear_regression(df, target, request.features))
+    result = await run_in_threadpool(
+        run_linear_regression(df, target, request.features)
+    )
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -995,20 +1025,26 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
 
     target = request.params.get("target") if request.params else None
     if not target:
-        raise HTTPException(status_code=400, detail="Target column not specified in params")
+        raise HTTPException(
+            status_code=400, detail="Target column not specified in params"
+        )
 
     if target not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Target column '{target}' not found")
+        raise HTTPException(
+            status_code=400, detail=f"Target column '{target}' not found"
+        )
 
     # Check if binary
     unique_vals = df[target].dropna().unique()
     if len(unique_vals) != 2:
         raise HTTPException(
             status_code=400,
-            detail=f"Target must be binary (2 classes), found {len(unique_vals)} classes"
+            detail=f"Target must be binary (2 classes), found {len(unique_vals)} classes",
         )
 
-    result = await run_in_threadpool(run_logistic_regression(df, target, request.features))
+    result = await run_in_threadpool(
+        run_logistic_regression(df, target, request.features)
+    )
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -1032,7 +1068,11 @@ async def prophet_forecast(request: DiagnosticRequest) -> dict:
     date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]
     if not date_cols:
         # Try to find date-like columns
-        date_cols = [c for c in df.columns if any(kw in c.lower() for kw in ["date", "日期", "年", "time", "月"])]
+        date_cols = [
+            c
+            for c in df.columns
+            if any(kw in c.lower() for kw in ["date", "日期", "年", "time", "月"])
+        ]
 
     if not date_cols:
         raise HTTPException(status_code=400, detail="No date column found")
@@ -1045,7 +1085,9 @@ async def prophet_forecast(request: DiagnosticRequest) -> dict:
     value_col = num_cols[0]
     periods = 6
 
-    result = await run_in_threadpool(run_prophet_forecast(df, date_col, value_col, periods))
+    result = await run_in_threadpool(
+        run_prophet_forecast(df, date_col, value_col, periods)
+    )
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

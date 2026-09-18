@@ -29,7 +29,22 @@ interface LLMSelectorProps {
 }
 
 export function LLMSelector({ collapsed }: LLMSelectorProps) {
-    const store = useSettingsStore();
+    // 逐欄位訂閱：整個 store 訂閱會讓任何欄位變動都重繪整個面板，
+    // 也會讓 useCallback 的依賴每次都是新物件而反覆重打 /api/llm/models。
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
+    const fastProvider = useSettingsStore((s) => s.fastProvider);
+    const fastModel = useSettingsStore((s) => s.fastModel);
+    const fastUrl = useSettingsStore((s) => s.fastUrl);
+    const setProvider = useSettingsStore((s) => s.setProvider);
+    const setModel = useSettingsStore((s) => s.setModel);
+    const setLocalUrl = useSettingsStore((s) => s.setLocalUrl);
+    const setApiKey = useSettingsStore((s) => s.setApiKey);
+    const setFastProvider = useSettingsStore((s) => s.setFastProvider);
+    const setFastModel = useSettingsStore((s) => s.setFastModel);
+    const setFastUrl = useSettingsStore((s) => s.setFastUrl);
     const [isOpen, setIsOpen] = useState(false);
     
     // Local state for fetched models
@@ -65,9 +80,9 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
                 
                 // Auto-select defaults
                 if (tier === "main") {
-                    if (!store.model_name || !models.includes(store.model_name)) store.setModel(models[0]);
+                    if (!model_name || !models.includes(model_name)) setModel(models[0]);
                 } else {
-                    if (!store.fastModel || !models.includes(store.fastModel)) store.setFastModel(models[0]);
+                    if (!fastModel || !models.includes(fastModel)) setFastModel(models[0]);
                 }
             } else {
                 if (tier === "main") setMainModels([]);
@@ -82,45 +97,49 @@ export function LLMSelector({ collapsed }: LLMSelectorProps) {
                 else setLoadingFast(false);
             }
         }
-    }, [store]);
+    }, [setModel, setFastModel, model_name, fastModel]);
 
     // Auto-detect Main
     useEffect(() => {
         const timer = setTimeout(() => {
-if (store.provider?.includes("Local") || store.provider === "Ollama" || store.provider === "omlx") {
-    fetchModelsForTier("main", store.provider, store.local_url || "", store.api_key || "", true);
+if (provider?.includes("Local") || provider === "Ollama" || provider === "omlx") {
+    fetchModelsForTier("main", provider, local_url || "", api_key || "", true);
   }
         }, 800);
         return () => clearTimeout(timer);
-    }, [store.provider, store.local_url, store.api_key, fetchModelsForTier]);
+    }, [provider, local_url, api_key, fetchModelsForTier]);
 
     // Auto-detect Fast
     useEffect(() => {
         const timer = setTimeout(() => {
-if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || store.fastProvider === "omlx") {
-    fetchModelsForTier("fast", store.fastProvider, store.fastUrl || "", store.api_key || "", true);
+if (fastProvider?.includes("Local") || fastProvider === "Ollama" || fastProvider === "omlx") {
+    fetchModelsForTier("fast", fastProvider, fastUrl || "", api_key || "", true);
   }
         }, 800);
         return () => clearTimeout(timer);
-    }, [store.fastProvider, store.fastUrl, store.api_key, fetchModelsForTier]);
+    }, [fastProvider, fastUrl, api_key, fetchModelsForTier]);
 
     // Initial load
     useEffect(() => {
-        fetchModelsForTier("main", store.provider || "", store.local_url || "", store.api_key || "", true);
-        fetchModelsForTier("fast", store.fastProvider || "", store.fastUrl || "", store.api_key || "", true);
-    }, [fetchModelsForTier, store.provider, store.local_url, store.api_key, store.fastProvider, store.fastUrl]);
+        fetchModelsForTier("main", provider || "", local_url || "", api_key || "", true);
+        fetchModelsForTier("fast", fastProvider || "", fastUrl || "", api_key || "", true);
+    }, [fetchModelsForTier, provider, local_url, api_key, fastProvider, fastUrl]);
 
     const renderConfig = (type: "main" | "fast") => {
         const isMain = type === "main";
-        const provider = isMain ? store.provider : store.fastProvider;
-        const model = isMain ? store.model_name : store.fastModel;
-        const url = isMain ? store.local_url : store.fastUrl;
-        const setProvider = isMain ? store.setProvider : store.setFastProvider;
-        const setModel = isMain ? store.setModel : store.setFastModel;
-        const setUrl = isMain ? store.setLocalUrl : store.setFastUrl;
+        const activeProvider = isMain ? provider : fastProvider;
+        const activeModel = isMain ? model_name : fastModel;
+        const activeUrl = isMain ? local_url : fastUrl;
+        const applyProvider = isMain ? setProvider : setFastProvider;
+        const applyModel = isMain ? setModel : setFastModel;
+        const applyUrl = isMain ? setLocalUrl : setFastUrl;
         const currentModels = isMain ? mainModels : fastModels;
         const isLoading = isMain ? loadingMain : loadingFast;
-        
+        const isLocalProvider =
+            activeProvider?.includes("Local") ||
+            activeProvider?.includes("Ollama") ||
+            activeProvider === "omlx";
+
         return (
             <div className="space-y-3 pt-2">
                 <div className="space-y-1">
@@ -128,17 +147,20 @@ if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || 
                         <Server size={12} /> 提供者 (Provider)
                     </label>
                     <select
-                        value={provider || ""}
+                        value={activeProvider || ""}
                         onChange={(e) => {
                             const newProvider = e.target.value;
-                            setProvider(newProvider);
-                            if (newProvider === "Gemini") setModel(isMain ? "gemini-1.5-pro" : "gemini-1.5-flash");
-                            else if (newProvider === "OpenAI") setModel("gpt-4o");
-                            else if (newProvider === "omlx") {
-                                setUrl("http://127.0.0.1:8000/v1");
-                                setModel("");
+                            applyProvider(newProvider);
+                            if (newProvider === "Gemini") {
+                                applyModel(isMain ? "gemini-1.5-pro" : "gemini-1.5-flash");
+                            } else if (newProvider === "OpenAI") {
+                                applyModel("gpt-4o");
+                            } else if (newProvider === "omlx") {
+                                applyUrl("http://127.0.0.1:8000/v1");
+                                applyModel("");
+                            } else {
+                                applyModel("");
                             }
-                            else setModel(""); 
                         }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
                     >
@@ -154,7 +176,7 @@ if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || 
                             <Bot size={12} /> 模型名稱
                         </label>
                         <button
-                            onClick={() => fetchModelsForTier(type, provider || "", url || "", store.api_key || "")}
+                            onClick={() => fetchModelsForTier(type, activeProvider || "", activeUrl || "", api_key || "")}
                             disabled={isLoading}
                             className="text-[10px] text-blue-400 hover:text-blue-300 disabled:opacity-50 p-1 hover:bg-slate-800 rounded transition-all"
                             title="重新整理模型列表"
@@ -165,8 +187,8 @@ if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || 
 
                     {currentModels.length > 0 ? (
                         <select
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
+                            value={activeModel}
+                            onChange={(e) => applyModel(e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
                         >
                             {currentModels.map((m) => (
@@ -175,37 +197,41 @@ if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || 
                         </select>
                     ) : (
                         <Input
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
+                            value={activeModel}
+                            onChange={(e) => applyModel(e.target.value)}
                             className="h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 rounded-lg"
                             placeholder="輸入模型名稱..."
                         />
                     )}
                 </div>
 
-                {(provider?.includes("Local") || provider?.includes("Ollama") || provider === "omlx") && (
+                {isLocalProvider && (
                     <div className="space-y-1">
                         <label className="text-xs text-slate-500 font-medium">API URL</label>
                         <Input
-                            value={url}
-                            onChange={(e) => setUrl(e.target.value)}
+                            value={activeUrl}
+                            onChange={(e) => applyUrl(e.target.value)}
                             className="h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 rounded-lg"
                         />
                     </div>
                 )}
 
-                {(provider === "Gemini" || provider === "OpenAI") && (
+                {(activeProvider === "Gemini" || activeProvider === "OpenAI") && (
                     <div className="space-y-1 pt-2 border-t border-slate-700/50">
                         <label className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                            <Key size={12} /> {provider === "OpenAI" ? "API Key" : "Google API Key"}
+                            <Key size={12} /> {activeProvider === "OpenAI" ? "API Key" : "Google API Key"}
                         </label>
                         <Input
                             type="password"
-                            value={store.api_key || ""}
-                            onChange={(e) => store.setApiKey(e.target.value)}
+                            value={api_key || ""}
+                            onChange={(e) => setApiKey(e.target.value)}
                             className="h-9 bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-600 rounded-lg"
                             placeholder="sk-..."
                         />
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                            留空則使用伺服器端設定的金鑰；金鑰只存在這個瀏覽器分頁的記憶體中，
+                            不會寫入 localStorage。
+                        </p>
                     </div>
                 )}
             </div>
@@ -263,7 +289,7 @@ if (store.fastProvider?.includes("Local") || store.fastProvider === "Ollama" || 
             {!isOpen && (
                 <div className="text-xs text-slate-500 mt-2 truncate flex items-center gap-1.5 pl-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500/50"></div>
-                    {store.provider} <span className="text-slate-600">/</span> {store.model_name}
+                    {provider} <span className="text-slate-600">/</span> {model_name}
                 </div>
             )}
         </div>

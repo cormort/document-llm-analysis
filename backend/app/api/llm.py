@@ -25,7 +25,7 @@ from app.models.llm import (
 from app.models.user import User
 from app.services.llm_queue import acquire_llm, release_llm
 from app.services.llm_service import llm_service
-from app.utils.file_resolver import load_dataframe
+from app.utils.file_resolver import load_dataframe, resolve_data_file
 
 router = APIRouter()
 
@@ -37,6 +37,21 @@ async def load_dataframe_async(file_path: str):
     event loop（單一 worker 時整個服務都會被拖住）。
     """
     return await run_in_threadpool(load_dataframe, file_path)
+
+
+def _resolve_upload_path(file_path: str) -> str:
+    """把使用者提供的檔名解析成資料目錄內的實際路徑。
+
+    與 stats / reports 等端點一致：不接受任意絕對路徑，
+    避免匿名／低權限使用者拿這個端點讀取伺服器上的其他檔案。
+    """
+    resolved = resolve_data_file(file_path)
+    if resolved is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"檔案未找到或不在允許的資料目錄內: {file_path}",
+        )
+    return str(resolved)
 
 
 async def stream_response(content: str) -> AsyncGenerator[dict[str, str], None]:
@@ -66,30 +81,6 @@ async def stream_response_with_queue(
         }
     async for chunk in stream_response(content):
         yield chunk
-
-
-@router.get("/queue/status")
-async def get_queue_status(
-    current_user: Annotated[User | None, Depends(get_current_user)] = None,
-) -> dict:
-    """取得 LLM 佇列狀態。"""
-    from app.services.llm_queue import llm_queue
-
-    status = llm_queue.get_status()
-    user_position = None
-
-    if current_user:
-        user_info = llm_queue.get_user_position(current_user.id)
-        if user_info:
-            user_position = user_info["position"]
-
-    return {
-        "queue_length": status["queue_length"],
-        "active_count": status["active_count"],
-        "your_position": user_position,
-        "is_available": status["active_count"] < status["max_concurrent"]
-        and status["queue_length"] == 0,
-    }
 
 
 @router.post("/analyze", response_model=LLMResponse)
@@ -156,9 +147,10 @@ async def analyze_text_stream(
 @router.post("/analyze-file", response_model=LLMResponse)
 async def analyze_file(request: AnalyzeFileRequest) -> LLMResponse:
     """Analyze file content using LLM."""
+    file_path = _resolve_upload_path(request.file_path)
     try:
         result = await llm_service.analyze_file(
-            file_path=request.file_path,
+            file_path=file_path,
             user_instruction=request.instruction,
             provider=request.config.provider,
             model_name=request.config.model_name,
@@ -175,9 +167,10 @@ async def analyze_file(request: AnalyzeFileRequest) -> LLMResponse:
 @router.post("/analyze-file/stream")
 async def analyze_file_stream(request: AnalyzeFileRequest) -> EventSourceResponse:
     """Analyze file with SSE streaming response."""
+    file_path = _resolve_upload_path(request.file_path)
     try:
         result = await llm_service.analyze_file(
-            file_path=request.file_path,
+            file_path=file_path,
             user_instruction=request.instruction,
             provider=request.config.provider,
             model_name=request.config.model_name,
@@ -251,7 +244,6 @@ async def fix_query(request: QueryFixRequest) -> LLMResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-
 class InterpretRequest(BaseModel):
     question: str
     results_summary: str
@@ -317,6 +309,7 @@ async def list_models_get(
         # omlx: always prefer env-configured key (frontend may send stale cloud keys)
         if provider == "omlx":
             from app.core.config import settings as cfg
+
             effective_key = cfg.OMLX_API_KEY or api_key or None
 
         models = await llm_service.list_models(

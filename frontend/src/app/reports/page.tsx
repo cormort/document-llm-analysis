@@ -17,9 +17,15 @@ import { useDocumentStore } from "@/stores/document-store";
 
 export default function ReportsPage() {
     console.log("ReportsPage Rendering");
-    const { provider, model_name, local_url, api_key, context_window } = useSettingsStore();
+    const provider = useSettingsStore((s) => s.provider);
+    const model_name = useSettingsStore((s) => s.model_name);
+    const local_url = useSettingsStore((s) => s.local_url);
+    const api_key = useSettingsStore((s) => s.api_key);
+    const context_window = useSettingsStore((s) => s.context_window);
     
-    const { documents, fetchDocuments } = useDocumentStore();
+    const documents = useDocumentStore((s) => s.documents);
+    
+    const fetchDocuments = useDocumentStore((s) => s.fetchDocuments);
     const [skills, setSkills] = useState<SkillInfo[]>([]);
     const [templates, setTemplates] = useState<TemplateInfo[]>([]);
     const [loading, setLoading] = useState(true);
