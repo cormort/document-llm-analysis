@@ -141,6 +141,11 @@ export default function StatisticsPage() {
 
         } catch (err) {
             console.error("Full analysis failed", err);
+            // 先前失敗時進度會永遠卡在 running、且按鈕永久 disabled
+            setAnalysisProgress(p => ({ ...p, inference: "error" }));
+        } finally {
+            setIsFullAnalysis(false);
+            setProcessing(false);
         }
     };
 

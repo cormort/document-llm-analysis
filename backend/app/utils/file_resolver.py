@@ -50,6 +50,11 @@ ALLOWED_ROOTS: tuple[Path, ...] = (
 )
 
 
+def is_within_allowed_roots(path: Path) -> bool:
+    """公開的邊界檢查：path 是否位於允許的資料根目錄底下。"""
+    return any(_is_within(path, root) for root in ALLOWED_ROOTS)
+
+
 def resolve_data_file(
     file_path_str: str, *, allow_outside_allowed_roots: bool = False
 ) -> Path | None:

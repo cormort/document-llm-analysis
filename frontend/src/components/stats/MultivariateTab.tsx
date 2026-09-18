@@ -13,13 +13,14 @@ import {
     performMultivariate,
     DiagnosticResponse,
     MultivariateResponse,
-    MultivariateRequest
+    MultivariateRequest,
+    LLMConfig,
 } from "@/lib/api";
 
 interface MultivariateTabProps {
     selectedDoc: string | null;
     filePath: string | null;
-    config?: any;
+    config?: LLMConfig;
     diagnostics: DiagnosticResponse | null;
 }
 
@@ -74,9 +75,12 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
         try {
             const res = await performMultivariate(req);
             setResult(res);
-        } catch (error: any) {
+        } catch (error) {
             console.error("Multivariate analysis failed:", error);
-            alert("分析失敗: " + error.message);
+            alert(
+                "分析失敗: " +
+                    (error instanceof Error ? error.message : String(error))
+            );
         } finally {
             setProcessing(false);
         }
@@ -97,7 +101,7 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
                     <Card className="p-6 bg-white shadow-sm border-slate-100 flex flex-col h-[350px]">
                         <h4 className="font-bold text-slate-700 mb-4 text-sm">主成分散佈圖 (PC1 vs PC2)</h4>
                         <div className="flex-1 min-h-0 w-full relative">
-                            {data.n_components >= 2 ? (
+                            {(data.n_components ?? 0) >= 2 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: -20 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -124,7 +128,7 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
                                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                    <Tooltip formatter={(val: number) => val.toFixed(2) + '%'} />
+                                    <Tooltip formatter={(val) => `${Number(val ?? 0).toFixed(2)}%`} />
                                     <Bar dataKey="variance" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -172,7 +176,9 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
         const centerData = [];
         if (data.cluster_centers) {
             for (const feature of selectedFeatures) {
-                const row: any = { feature };
+                const row: Record<string, string | number | undefined> = {
+                    feature,
+                };
                 Object.keys(data.cluster_centers).forEach((clusterName, idx) => {
                     row[clusterName] = data.cluster_centers![clusterName][feature];
                 });
@@ -251,7 +257,10 @@ export function MultivariateTab({ selectedDoc, filePath, config, diagnostics }: 
                         {/* Analysis Type */}
                         <div className="space-y-3">
                             <label className="text-xs font-bold text-slate-700">演算法類型</label>
-                            <Tabs value={analysisType} onValueChange={(v) => { setAnalysisType(v as any); setResult(null); }} className="w-full">
+                            <Tabs value={analysisType} onValueChange={(v) => {
+                                    setAnalysisType(v as "pca" | "kmeans");
+                                    setResult(null);
+                                }} className="w-full">
                                 <TabsList className="grid grid-cols-2 w-full p-1 bg-slate-100 h-auto rounded-lg">
                                     <TabsTrigger value="pca" className="text-xs py-2 rounded-md font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600"><Compass size={14} className="mr-1.5"/>PCA</TabsTrigger>
                                     <TabsTrigger value="kmeans" className="text-xs py-2 rounded-md font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600"><Layers size={14} className="mr-1.5"/>K-Means</TabsTrigger>

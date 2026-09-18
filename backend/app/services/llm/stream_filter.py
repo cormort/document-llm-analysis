@@ -1,5 +1,20 @@
+"""過濾 LLM 輸出中的「思考過程」與自言自語。
+
+修正重點（原本的 bug）：
+`THOUGHT_TAGS` 以 `"think"` 開頭，而 `_find_thought_tag_open` 用
+`text.find("<think")` 依序比對並直接回傳第一個命中的 tag，
+因此 `<thinking>...</thinking>` 會被誤判成 tag `think`，
+接著去尋找永遠不存在的 `</think>`，導致**整段回答被吃掉**。
+
+現在改成：
+1. 取「最早出現」的 tag；同一位置若多個 tag 都匹配，取**最長**的那個
+   （`thinking` 優先於 `think`）。
+2. tag 後面必須接 `>` 或空白，避免 `<thinktank>` 之類的誤判。
+3. 收尾標籤允許 `</tag>` 與 `</tag >`。
+"""
+
 import re
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 
 class StreamFilter:
@@ -36,21 +51,47 @@ class StreamFilter:
         r"^I'll",
     ]
 
-    # Gemma 4 / DeepSeek / QwQ use <think>, others use <thinking> etc.
-    THOUGHT_TAGS = ["think", "thought", "thinking", "reasoning", "internal", "scratchpad"]
+    # Gemma / DeepSeek / QwQ use <think>, others use <thinking> etc.
+    # 注意順序不影響判定（會取最長匹配），但由長到短可讀性較好。
+    THOUGHT_TAGS = ["thinking", "thought", "reasoning", "scratchpad", "internal", "think"]
 
     def __init__(self):
         self.buffer = ""
         self.in_thought_block = False
         self.current_tag = None
 
-    def _find_thought_tag_open(self, text: str) -> tuple[int, str] | None:
+    # ------------------------------------------------------------------
+    # Tag helpers
+    # ------------------------------------------------------------------
+    def _find_thought_tag_open(self, text: str) -> tuple[int, str, int] | None:
+        """回傳 (tag 起始索引, tag 名稱, 內容起始索引)；取最早出現、同位置取最長者。
+
+        只有當 `<tag ...>` 的 `>` 已經出現在 buffer 中時才算命中；
+        標籤還沒收尾（例如 chunk 結尾剛好切成 `"<thin"`）時回傳 None，
+        由 `_find_potential_tag_open` 讓呼叫端繼續等待後續 chunk。
+        """
+        lower = text.lower()
+        best: tuple[int, str, int] | None = None
         for tag in self.THOUGHT_TAGS:
-            pattern = f"<{tag}"
-            idx = text.lower().find(pattern)
-            if idx != -1:
-                return idx, tag
-        return None
+            idx = 0
+            while True:
+                idx = lower.find(f"<{tag}", idx)
+                if idx == -1:
+                    break
+                end = idx + len(tag) + 1
+                following = lower[end : end + 1]
+                # 標籤後面必須是 `>` 或空白（允許 <think >），否則可能是 <thinktank>
+                if following in (">", " ", "\t", "\n", "\r"):
+                    gt = lower.find(">", end)
+                    if gt == -1:
+                        return best  # 標籤尚未收尾，等更多資料
+                    if best is None or idx < best[0] or (
+                        idx == best[0] and len(tag) > len(best[1])
+                    ):
+                        best = (idx, tag, gt + 1)
+                    break
+                idx += 1
+        return best
 
     def _find_potential_tag_open(self, text: str) -> bool:
         """Check if buffer might be starting a thought tag (partial match)."""
@@ -65,18 +106,22 @@ class StreamFilter:
     def _find_potential_tag_close(self, text: str, tag: str) -> bool:
         """Check if buffer might be starting a close tag (partial match)."""
         text_lower = text.lower()
-        close_tag = f"</{tag}>"
         if f"</{tag}" in text_lower:
             return True
         if any(text_lower.endswith(f"</{tag[:i]}") for i in range(1, len(tag) + 1)):
             return True
-        if text_lower.endswith("</") or text_lower.endswith("<"):
-            return True
-        return False
+        return text_lower.endswith("</") or text_lower.endswith("<")
 
-    def _find_tag_close(self, text: str, tag: str) -> int:
-        close_pattern = f"</{tag}>"
-        return text.lower().find(close_pattern)
+    def _find_tag_close(self, text: str, tag: str) -> tuple[int, int] | None:
+        """找收尾標籤。
+
+        Returns:
+            (起始索引, 結束索引（不含）) 或 None。支援 `</tag>` 與 `</tag >`。
+        """
+        match = re.search(rf"</{re.escape(tag)}\s*>", text, re.IGNORECASE)
+        if not match:
+            return None
+        return match.start(), match.end()
 
     def _filter_prefixes(self, text: str) -> str:
         """Filter out lines that start with thinking prefixes."""
@@ -91,6 +136,9 @@ class StreamFilter:
                 filtered_lines.append(line)
         return "\n".join(filtered_lines)
 
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
     async def filter_stream(
         self, stream: AsyncGenerator[str, None]
     ) -> AsyncGenerator[str, None]:
@@ -104,41 +152,40 @@ class StreamFilter:
                 if not self.in_thought_block:
                     found = self._find_thought_tag_open(self.buffer)
                     if found:
-                        idx, tag = found
+                        idx, tag, content_start = found
                         before_tag = self.buffer[:idx]
                         after_open_tag = self.buffer[idx:]
-                        close_idx = self._find_tag_close(after_open_tag, tag)
+                        close = self._find_tag_close(after_open_tag, tag)
 
-                        if close_idx != -1:
-                            close_tag_len = len(f"</{tag}>")
-                            after_content = after_open_tag[close_idx + close_tag_len :]
+                        if close is not None:
+                            _, close_end = close
+                            after_content = after_open_tag[close_end:]
                             self.buffer = before_tag + after_content
                             processed = True
                             continue
-                        else:
-                            if before_tag:
-                                yield self._filter_prefixes(before_tag)
-                            self.in_thought_block = True
-                            self.current_tag = tag
-                            self.buffer = ""
-                            break
-                    elif self._find_potential_tag_open(self.buffer):
+                        if before_tag:
+                            yield self._filter_prefixes(before_tag)
+                        self.in_thought_block = True
+                        self.current_tag = tag
+                        # 保留開標籤之後的內容：裡面可能已經有（部分的）收尾標籤
+                        self.buffer = after_open_tag[content_start:]
+                        break
+                    if self._find_potential_tag_open(self.buffer):
                         break
 
                 if self.in_thought_block:
-                    close_idx = self._find_tag_close(self.buffer, self.current_tag)
-                    if close_idx != -1:
-                        close_tag_len = len(f"</{self.current_tag}>")
-                        self.buffer = self.buffer[close_idx + close_tag_len :]
+                    close = self._find_tag_close(self.buffer, self.current_tag)
+                    if close is not None:
+                        _, close_end = close
+                        self.buffer = self.buffer[close_end:]
                         self.in_thought_block = False
                         self.current_tag = None
                         processed = True
                         continue
-                    elif self._find_potential_tag_close(self.buffer, self.current_tag):
+                    if self._find_potential_tag_close(self.buffer, self.current_tag):
                         break
-                    else:
-                        self.buffer = ""
-                        break
+                    self.buffer = ""
+                    break
 
                 if not processed:
                     break

@@ -61,7 +61,8 @@ export function LLMQueueStatus({ onStatusChange }: LLMQueueStatusProps) {
     return null;
   }
 
-  const isWaiting = status.your_position !== null && status.your_position > 0;
+  const position = status.your_position ?? 0;
+  const isWaiting = position > 0;
 
   return (
     <Card className="p-4 mb-4">
@@ -144,7 +145,8 @@ export function LLMQueueBanner() {
     return null;
   }
 
-  const isWaiting = status.your_position !== null && status.your_position > 0;
+  const position = status.your_position ?? 0;
+  const isWaiting = position > 0;
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
@@ -155,10 +157,10 @@ export function LLMQueueBanner() {
               <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
               <div>
                 <div className="font-medium text-amber-600">
-                  排隊中：第 {status.your_position} 位
+                  排隊中：第 {position} 位
                 </div>
                 <div className="text-xs text-slate-500">
-                  預計等待 {status.your_position * 30} 秒
+                  預計等待 {position * 30} 秒
                 </div>
               </div>
             </>

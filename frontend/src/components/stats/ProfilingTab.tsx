@@ -70,7 +70,7 @@ export function ProfilingTab({ selectedDoc, processing, diagnostics }: Profiling
             <div className="grid grid-cols-4 gap-4">
                 <Card className="p-4 bg-white border-none shadow-sm flex flex-col items-center justify-center">
                     <div className="text-2xl font-bold text-slate-700">
-                        {String(diagnostics.summary_stats.count || diagnostics.quality_report[0].unique_count || "0")}
+                        {String(diagnostics.summary_stats.count ?? diagnostics.quality_report[0]?.unique_count ?? "0")}
                     </div>
                 </Card>
                 <Card className="p-4 bg-white border-none shadow-sm flex flex-col items-center justify-center">

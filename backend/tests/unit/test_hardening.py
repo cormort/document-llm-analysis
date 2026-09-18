@@ -126,3 +126,80 @@ class TestSettingsHardening:
             ).allow_anonymous_access
             is True
         )
+
+
+class TestMcpUriValidation:
+    """MCP convert-to-markdown 的 uri 檢查。"""
+
+    def test_rejects_arbitrary_file_uri(self):
+        from app.api.mcp_tools import UnsafeUriError, _validate_uri
+
+        with pytest.raises(UnsafeUriError):
+            _validate_uri("file:///etc/passwd")
+
+    def test_rejects_path_traversal_in_file_uri(self):
+        from app.api.mcp_tools import UnsafeUriError, _validate_uri
+
+        with pytest.raises(UnsafeUriError):
+            _validate_uri("file:///tmp/../../etc/passwd")
+
+    def test_rejects_unsupported_scheme(self):
+        from app.api.mcp_tools import UnsafeUriError, _validate_uri
+
+        for uri in ["gopher://x/", "ftp://host/f", "javascript:alert(1)", ""]:
+            with pytest.raises(UnsafeUriError):
+                _validate_uri(uri)
+
+    def test_rejects_cloud_metadata(self):
+        from app.api.mcp_tools import UnsafeUriError, _validate_uri
+
+        with pytest.raises(UnsafeUriError):
+            _validate_uri("http://169.254.169.254/latest/meta-data/")
+
+    def test_allows_public_http_and_data_uri(self):
+        from app.api.mcp_tools import _validate_uri
+
+        assert _validate_uri("https://example.com/a.pdf") == "https://example.com/a.pdf"
+        assert _validate_uri("data:text/plain,hi") == "data:text/plain,hi"
+
+    def test_allows_file_uri_inside_data_dir(self, tmp_path, monkeypatch):
+        from app.api import mcp_tools as mcp_module
+
+        data_file = tmp_path / "ok.csv"
+        data_file.write_text("a,b\n1,2")
+        monkeypatch.setattr(
+            mcp_module, "is_within_allowed_roots", lambda _p: True, raising=True
+        )
+        assert mcp_module._validate_uri(f"file://{data_file}") == f"file://{data_file}"
+
+
+class TestUrlGuard:
+    def test_blocks_metadata_and_link_local(self):
+        from app.utils.url_guard import UnsafeUrlError, validate_outbound_url
+
+        for url in [
+            "http://169.254.169.254/computeMetadata/v1/",
+            "http://metadata.google.internal/x",
+        ]:
+            with pytest.raises(UnsafeUrlError):
+                validate_outbound_url(url)
+
+    def test_blocks_non_http_schemes(self):
+        from app.utils.url_guard import UnsafeUrlError, validate_outbound_url
+
+        with pytest.raises(UnsafeUrlError):
+            validate_outbound_url("file:///etc/passwd")
+
+    def test_allows_localhost_by_default(self):
+        from app.utils.url_guard import validate_outbound_url
+
+        assert (
+            validate_outbound_url("http://localhost:11434/v1/")
+            == "http://localhost:11434/v1"
+        )
+
+    def test_can_forbid_private_addresses(self):
+        from app.utils.url_guard import UnsafeUrlError, validate_outbound_url
+
+        with pytest.raises(UnsafeUrlError):
+            validate_outbound_url("http://127.0.0.1:1234/v1", allow_private=False)

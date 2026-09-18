@@ -5,14 +5,21 @@ MCP Tools API - 暴露 MCP Server 工具給前端使用。
 """
 
 import os
+import uuid
+from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import structlog
+from fastapi import APIRouter, File, UploadFile
+from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
+
 from app.services.mcp_client_manager import (
     init_mcp_manager,
 )
-from fastapi import APIRouter, File, UploadFile
-from pydantic import BaseModel, Field
+from app.utils.file_resolver import is_within_allowed_roots
+from app.utils.url_guard import UnsafeUrlError, validate_outbound_url
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/mcp", tags=["MCP Tools"])
@@ -24,6 +31,68 @@ TEMP_DIR = os.path.join(
     "temp",
 )
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+# convert-to-markdown 允許的來源類型
+ALLOWED_URI_SCHEMES = {"http", "https", "file", "data"}
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".txt",
+    ".csv",
+    ".xlsx",
+    ".xls",
+    ".json",
+    ".md",
+    ".pptx",
+    ".html",
+    ".htm",
+}
+MAX_MCP_UPLOAD_BYTES = 50 * 1024 * 1024
+
+
+class UnsafeUriError(ValueError):
+    """URI 未通過安全檢查。"""
+
+
+def _validate_uri(uri: str) -> str:
+    """限制 MCP convert-to-markdown 可存取的 URI。
+
+    先前 `uri` 直接透傳給 markitdown，任何人都能要求伺服器讀取
+    本機任意檔案（`file:///etc/passwd`）或對內網發請求（SSRF）。
+    這裡限制：`file://` 只能指向資料目錄底下，http(s) 需通過 SSRF 檢查。
+    """
+    if not uri or not uri.strip():
+        raise UnsafeUriError("uri 不可為空")
+    raw = uri.strip()
+    parts = urlsplit(raw)
+    scheme = parts.scheme.lower()
+
+    if scheme not in ALLOWED_URI_SCHEMES:
+        raise UnsafeUriError(f"不允許的 URI scheme: {scheme or '無'}")
+
+    if scheme == "file":
+        target = Path(unquote(parts.path))
+        if not is_within_allowed_roots(target):
+            raise UnsafeUriError("file:// URI 只能指向伺服器的資料目錄")
+        if not target.exists():
+            raise UnsafeUriError("找不到指定的檔案")
+        return raw
+
+    if scheme in ("http", "https"):
+        from app.core.config import settings
+
+        try:
+            return validate_outbound_url(
+                raw,
+                allow_private=settings.ALLOW_PRIVATE_LLM_URLS,
+                field_name="uri",
+            )
+        except UnsafeUrlError as e:
+            raise UnsafeUriError(str(e)) from e
+
+    # data: URI 不會觸及伺服器檔案系統或網路
+    return raw
 
 
 # ========== Request/Response Models ==========
@@ -145,6 +214,13 @@ async def call_mcp_tool(request: MCPToolCallRequest) -> MCPToolCallResponse:
     """
     try:
         manager = await init_mcp_manager()
+        # 只允許呼叫 mcp_config.json 中已設定的 server
+        known_servers = set(getattr(manager, "servers", {}) or {})
+        if known_servers and request.server_name not in known_servers:
+            return MCPToolCallResponse(
+                success=False,
+                error=f"未設定的 MCP server: {request.server_name}",
+            )
         result = await manager.call_tool(
             request.server_name,
             request.tool_name,
@@ -173,18 +249,25 @@ async def call_mcp_tool(request: MCPToolCallRequest) -> MCPToolCallResponse:
 
 
 @router.post("/convert-to-markdown", response_model=ConvertToMarkdownResponse)
-async def convert_to_markdown(request: ConvertToMarkdownRequest) -> ConvertToMarkdownResponse:
+async def convert_to_markdown(
+    request: ConvertToMarkdownRequest,
+) -> ConvertToMarkdownResponse:
     """
     使用 markitdown-mcp 將檔案轉換為 Markdown
 
     支援的格式：PDF, DOCX, XLSX, PPTX, HTML, 圖片等。
     """
     try:
+        safe_uri = _validate_uri(request.uri)
+    except UnsafeUriError as e:
+        return ConvertToMarkdownResponse(success=False, error=str(e))
+
+    try:
         manager = await init_mcp_manager()
         result = await manager.call_tool(
             "markitdown",
             "convert_to_markdown",
-            {"uri": request.uri},
+            {"uri": safe_uri},
         )
 
         if result.get("success"):
@@ -204,7 +287,7 @@ async def convert_to_markdown(request: ConvertToMarkdownRequest) -> ConvertToMar
 
 @router.post("/convert-to-markdown/upload", response_model=ConvertToMarkdownResponse)
 async def convert_uploaded_file_to_markdown(
-    file: UploadFile = File(...),
+    file: UploadFile = File(...),  # noqa: B008
 ) -> ConvertToMarkdownResponse:
     """
     上傳檔案並轉換為 Markdown
@@ -212,12 +295,24 @@ async def convert_uploaded_file_to_markdown(
     支援的格式：PDF, DOCX, XLSX, PPTX, HTML, 圖片等。
     """
     try:
-        # 儲存上傳的檔案
-        filename = file.filename or "uploaded_file"
-        temp_path = os.path.join(TEMP_DIR, filename)
-        with open(temp_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # 儲存上傳的檔案（檔名必須淨化，否則 `../../` 可寫到任意位置）
+        raw_name = file.filename or "uploaded_file"
+        filename = Path(raw_name).name
+        extension = Path(filename).suffix.lower()
+        if extension not in ALLOWED_UPLOAD_EXTENSIONS:
+            return ConvertToMarkdownResponse(
+                success=False, error=f"不支援的檔案類型: {extension or '未知'}"
+            )
+
+        content = await file.read()
+        if len(content) > MAX_MCP_UPLOAD_BYTES:
+            return ConvertToMarkdownResponse(
+                success=False,
+                error=f"檔案超過 {MAX_MCP_UPLOAD_BYTES // (1024 * 1024)}MB 限制",
+            )
+
+        temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4().hex[:8]}_{filename}")
+        await run_in_threadpool(Path(temp_path).write_bytes, content)
 
         # 轉換為 file:// URI
         uri = f"file://{os.path.abspath(temp_path)}"
@@ -246,7 +341,9 @@ async def convert_uploaded_file_to_markdown(
             )
 
     except Exception as e:
-        logger.error("Convert uploaded file failed", filename=file.filename, error=str(e))
+        logger.error(
+            "Convert uploaded file failed", filename=file.filename, error=str(e)
+        )
         return ConvertToMarkdownResponse(success=False, error=str(e))
 
 

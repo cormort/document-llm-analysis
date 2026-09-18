@@ -273,7 +273,7 @@ export default function ReportsPage() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h5 className="text-sm font-bold text-on-surface truncate">{doc.file_name}</h5>
-                                                <p className="text-[11px] text-on-surface-variant truncate">Indexed: {doc.indexed_at.substring(0, 10)}</p>
+                                                <p className="text-[11px] text-on-surface-variant truncate">Indexed: {(doc.indexed_at ?? "").substring(0, 10)}</p>
                                             </div>
                                             {selectedDoc === doc.collection_name && (
                                                  <span className="material-symbols-outlined text-primary text-sm mt-1">check_circle</span>

@@ -3,17 +3,17 @@
 import os
 from tempfile import NamedTemporaryFile
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
-import structlog
 
 logger = structlog.get_logger(__name__)
-from fastapi.responses import FileResponse
 
 from app.models.reports import ReportGenerateRequest, ReportResponse, SkillInfo
 from app.services.llm_service import llm_service
 from app.services.report_exporter import generate_docx_report
 from app.services.skills_registry import REPORT_TEMPLATES, SKILLS, get_skills_by_ids
+from app.utils.file_resolver import resolve_data_file
 
 router = APIRouter()
 
@@ -73,18 +73,15 @@ async def generate_report(request: ReportGenerateRequest) -> ReportResponse:
         full_instruction = f"Template: {request.template_name}\nSkills:\n{skills_text}\n\n{request.user_instruction}"
 
         if request.file_path:
-            # Resolve the file path - check if it's already absolute or just filename
-            file_path = request.file_path
-            if not os.path.isabs(file_path):
-                # Try to find in uploads directory
-                upload_path = os.path.join(UPLOAD_DIR, file_path)
-                if os.path.exists(upload_path):
-                    file_path = upload_path
-                else:
-                    # Try current working directory
-                    cwd_path = os.path.join(os.getcwd(), file_path)
-                    if os.path.exists(cwd_path):
-                        file_path = cwd_path
+            # 只用 resolve_data_file 解析（已限制在資料目錄內），
+            # 不再接受任意絕對路徑或 cwd 相對路徑，避免任意檔案讀取。
+            resolved = resolve_data_file(request.file_path)
+            if resolved is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"檔案未找到或不在允許的資料目錄內: {request.file_path}",
+                )
+            file_path = str(resolved)
 
             # Enable black-faced auditor mode for financial template
             is_financial_audit = request.template_name == "financial"

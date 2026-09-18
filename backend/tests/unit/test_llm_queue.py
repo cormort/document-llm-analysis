@@ -124,3 +124,50 @@ class TestLLMQueueService:
         assert len(status["waiting_items"]) == 2
         assert status["waiting_items"][0]["request_type"] == "chat"
         assert status["waiting_items"][1]["request_type"] == "rag"
+
+
+class TestQueueDrain:
+    """回歸測試：被喚醒的項目必須真正出隊，否則後續請求會永久逾時。"""
+
+    @pytest.mark.asyncio
+    async def test_third_request_is_not_starved(self, monkeypatch):
+        import app.services.llm_queue as queue_module
+        from app.services.llm_queue import acquire_llm, release_llm
+
+        service = LLMQueueService(max_concurrent=1, timeout_seconds=2)
+        monkeypatch.setattr(queue_module, "llm_queue", service)
+
+        item1 = await acquire_llm("chat", user_id=1)
+        assert item1.status == QueueStatus.PROCESSING
+        assert service.get_status()["active_count"] == 1
+
+        task2 = asyncio.create_task(acquire_llm("chat", user_id=2))
+        task3 = asyncio.create_task(acquire_llm("chat", user_id=3))
+        await asyncio.sleep(0.05)
+
+        assert service.get_status()["queue_length"] == 2
+
+        await release_llm(item1)
+        item2 = await asyncio.wait_for(task2, timeout=1)
+        assert item2.status == QueueStatus.PROCESSING
+        # 出隊後不應再留在等待佇列中（原本的 bug）
+        assert service.get_status()["queue_length"] == 1
+
+        await release_llm(item2)
+        item3 = await asyncio.wait_for(task3, timeout=1)
+        assert item3.status == QueueStatus.PROCESSING
+        assert service.get_status()["queue_length"] == 0
+
+        await release_llm(item3)
+        status = service.get_status()
+        assert status["active_count"] == 0
+        assert status["queue_length"] == 0
+
+    @pytest.mark.asyncio
+    async def test_wait_for_turn_timeout(self):
+        service = LLMQueueService(max_concurrent=1, timeout_seconds=0)
+        item = await service.enqueue("chat", user_id=1)
+        got_turn = await service.wait_for_turn(item)
+        assert got_turn is False
+        assert item.status == QueueStatus.TIMEOUT
+        assert len(service.queue) == 0

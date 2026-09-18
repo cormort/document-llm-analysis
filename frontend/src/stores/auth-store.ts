@@ -68,7 +68,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-export async function login(username: string, password: string): Promise<{ user: User; token: string }> {
+export async function login(
+  username: string,
+  password: string
+): Promise<{ user: User; access_token: string }> {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -85,7 +88,7 @@ export async function register(
   username: string,
   email: string,
   password: string
-): Promise<{ user: User; token: string }> {
+): Promise<{ user: User; access_token: string }> {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -48,6 +48,17 @@ export const useSettingsStore = create<SettingsState>()(
         }),
         {
             name: "llm-settings",
+            // 安全：API Key 不落地到 localStorage（任何 XSS 都能直接讀走）。
+            // 只保留非敏感設定，金鑰改為每個 session 重新輸入。
+            partialize: (state) => ({
+                provider: state.provider,
+                model_name: state.model_name,
+                local_url: state.local_url,
+                context_window: state.context_window,
+                fastProvider: state.fastProvider,
+                fastModel: state.fastModel,
+                fastUrl: state.fastUrl,
+            }),
         }
     )
 );

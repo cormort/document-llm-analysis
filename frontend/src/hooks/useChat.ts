@@ -33,7 +33,7 @@ export function useChat(options: UseChatOptions = {}) {
         mode,
     } = options;
 
-    const { addMessage, updateLastMessage, setStreaming, isStreaming } =
+    const { addMessage, updateLastMessage, appendToLastMessage, setStreaming, isStreaming } =
         useChatStore();
     const { provider, model_name, local_url, api_key } = useSettingsStore();
 
@@ -71,11 +71,40 @@ export function useChat(options: UseChatOptions = {}) {
                           },
                       });
 
-                // Use array buffer to avoid O(n²) string concatenation
-                const chunks: string[] = [];
-                for await (const chunk of stream) {
-                    chunks.push(chunk);
-                    updateLastMessage(chunks.join(""));
+                // 逐 chunk 重新 join 整個陣列是 O(n²)；改成累積待寫入內容，
+                // 每個動畫幀最多更新一次 state。
+                let pending = "";
+                let scheduled = false;
+                const flush = () => {
+                    scheduled = false;
+                    if (pending) {
+                        appendToLastMessage(pending);
+                        pending = "";
+                    }
+                };
+                const scheduleFlush = () => {
+                    if (scheduled) return;
+                    scheduled = true;
+                    if (typeof requestAnimationFrame === "function") {
+                        requestAnimationFrame(flush);
+                    } else {
+                        flush();
+                    }
+                };
+
+                try {
+                    for await (const chunk of stream) {
+                        pending += chunk;
+                        scheduleFlush();
+                    }
+                } finally {
+                    // 收尾時務必把剩下的內容寫進 state
+                    if (typeof requestAnimationFrame === "function" && scheduled) {
+                        await new Promise((resolve) =>
+                            requestAnimationFrame(() => resolve(null))
+                        );
+                    }
+                    flush();
                 }
             } catch (error) {
                 updateLastMessage(
@@ -101,6 +130,7 @@ export function useChat(options: UseChatOptions = {}) {
             api_key,
             addMessage,
             updateLastMessage,
+            appendToLastMessage,
             setStreaming,
         ]
     );

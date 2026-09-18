@@ -1,10 +1,13 @@
 import json
 import os
+from pathlib import Path
 
 import structlog
-from app.utils.excel_processor import smart_read_excel
 from docx import Document
 from pypdf import PdfReader
+
+from app.utils.excel_processor import smart_read_excel
+from app.utils.file_resolver import is_within_allowed_roots
 
 logger = structlog.get_logger()
 
@@ -13,9 +16,21 @@ class DocumentExtractionService:
     """Service for extracting text from PDF, Word, and Excel files."""
 
     async def extract_text(
-        self, file_path: str, start_page: int = 1, end_page: int = None
+        self,
+        file_path: str,
+        start_page: int = 1,
+        end_page: int = None,
+        allow_outside_data_dir: bool = False,
     ) -> str:
-        """Unified entry point for text extraction"""
+        """Unified entry point for text extraction.
+
+        這是所有檔案內容進到 LLM 的最後一道關卡，因此在服務邊界再做一次
+        資料目錄檢查（API 層若忘了驗證，這裡仍會擋下來）。
+        """
+        if not allow_outside_data_dir and not is_within_allowed_roots(Path(file_path)):
+            logger.warning("Blocked extraction outside data dir", file_path=file_path)
+            return "[Error: 不允許存取資料目錄以外的檔案]"
+
         ext = os.path.splitext(file_path)[1].lower()
         try:
             if ext == ".pdf":

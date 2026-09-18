@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { prefetch } from "next/navigation";
 import {
   Bot,
   Search,
@@ -11,7 +10,6 @@ import {
   ArrowRight
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useEffect, useState } from "react";
 
 const tools = [
   {
@@ -53,12 +51,6 @@ const tools = [
 ];
 
 export default function Dashboard() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <div className="min-h-screen bg-slate-50/50">
       <div className="max-w-6xl mx-auto px-6 py-12">

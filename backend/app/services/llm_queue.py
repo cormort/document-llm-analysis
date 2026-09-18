@@ -62,12 +62,25 @@ class LLMQueueService:
             session_id=session_id,
             request_type=request_type,
         )
+        await self.enqueue_item(item)
+        return item
 
+    async def enqueue_item(self, item: QueueItem) -> QueueItem:
+        """把既有的 QueueItem 加入佇列（供 acquire_llm 直接取用）。"""
         async with self._lock:
             item.position = len(self.queue) + 1
             self.queue.append(item)
-
         return item
+
+    async def try_acquire_immediately(self, item: QueueItem) -> bool:
+        """沒有等待者且未達併發上限時，直接開始處理（在鎖內檢查，避免競態）。"""
+        async with self._lock:
+            if self.queue or len(self.active_items) >= self.max_concurrent:
+                return False
+            item.status = QueueStatus.PROCESSING
+            item.started_at = datetime.now()
+            self.active_items.append(item)
+            return True
 
     async def wait_for_turn(self, item: QueueItem) -> bool:
         """等待輪到自己。"""
@@ -82,13 +95,15 @@ class LLMQueueService:
             return False
 
     async def start_processing(self, item: QueueItem) -> None:
-        """開始處理。"""
+        """開始處理（從等待佇列移入 active_items）。"""
         async with self._lock:
             if item in self.queue:
                 self.queue.remove(item)
             item.status = QueueStatus.PROCESSING
             item.started_at = datetime.now()
-            self.active_items.append(item)
+            if item not in self.active_items:
+                self.active_items.append(item)
+            self._update_positions()
 
     async def complete(
         self, item: QueueItem, result: dict[str, Any] | None = None
@@ -122,10 +137,10 @@ class LLMQueueService:
             item.position = i + 1
 
     def _notify_next(self) -> None:
-        """通知下一個等待者。"""
-        if self.queue and len(self.active_items) < self.max_concurrent:
-            next_item = self.queue[0]
-            next_item.event.set()
+        """通知下一個等待者（填滿可用的併發名額）。"""
+        available = self.max_concurrent - len(self.active_items)
+        for item in self.queue[: max(0, available)]:
+            item.event.set()
 
     def get_status(self) -> dict[str, Any]:
         """取得佇列狀態。"""
@@ -194,35 +209,34 @@ async def acquire_llm(
     user_id: int | None = None,
     session_id: str | None = None,
 ) -> QueueItem:
-    """取得 LLM 使用權。"""
-    global llm_queue
+    """取得 LLM 使用權。
 
-    if (
-        len(llm_queue.active_items) < llm_queue.max_concurrent
-        and len(llm_queue.queue) == 0
-    ):
-        item = QueueItem(
-            id=str(uuid.uuid4()),
-            user_id=user_id,
-            session_id=session_id,
-            request_type=request_type,
-            status=QueueStatus.PROCESSING,
-            started_at=datetime.now(),
-        )
-        llm_queue.active_items.append(item)
+    修正重點：先前從等待佇列被喚醒後，**沒有任何人呼叫 start_processing**，
+    項目會永遠留在 `queue` 裡；`complete()` 的 `_notify_next()` 因此永遠只會
+    叫醒同一個殘留項目，第三個之後的請求會一路等到 timeout。
+    """
+    item = QueueItem(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        session_id=session_id,
+        request_type=request_type,
+    )
+
+    if await llm_queue.try_acquire_immediately(item):
         return item
 
-    item = await llm_queue.enqueue(request_type, user_id, session_id)
+    await llm_queue.enqueue_item(item)
 
     got_turn = await llm_queue.wait_for_turn(item)
 
     if not got_turn:
         raise TimeoutError("等待 LLM 超時")
 
+    # 被喚醒後必須真正出隊並佔用一個併發名額
+    await llm_queue.start_processing(item)
     return item
 
 
 async def release_llm(item: QueueItem, result: dict | None = None) -> None:
     """釋放 LLM 使用權。"""
-    global llm_queue
     await llm_queue.complete(item, result)

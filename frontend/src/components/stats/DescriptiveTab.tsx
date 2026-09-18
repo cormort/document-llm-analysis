@@ -8,6 +8,13 @@ import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { getDescriptiveStats, interpretStats, DescriptiveStatsResponse, LLMConfig } from "@/lib/api";
 import { Ruler, Play, Bot, Sparkles, Loader2 } from "lucide-react";
 
+/** 後端遇到 NaN/Inf 時可能回傳 null，格式化前先防護（避免整頁白畫面） */
+function fmt(value: number | null | undefined, digits = 2): string {
+    return typeof value === "number" && Number.isFinite(value)
+        ? value.toFixed(digits)
+        : "-";
+}
+
 interface DescriptiveTabProps {
     selectedDoc: string | null;
     filePath: string | null;
@@ -114,17 +121,17 @@ export function DescriptiveTab({ selectedDoc, filePath, config }: DescriptiveTab
                                     {descriptiveStats.stats.map((row) => (
                                         <tr key={row.column} className="border-b border-slate-100 hover:bg-slate-50">
                                             <td className="p-2 font-mono font-bold text-blue-700 border-r">{row.column}</td>
-                                            <td className="p-2 text-right font-medium">{row.mean.toFixed(2)}</td>
-                                            <td className="p-2 text-right font-medium">{row.median.toFixed(2)}</td>
-                                            <td className="p-2 text-right text-slate-600">{row.std.toFixed(2)}</td>
-                                            <td className="p-2 text-right text-slate-400">{row.min.toFixed(1)}</td>
-                                            <td className="p-2 text-right text-slate-400">{row.q25.toFixed(1)}</td>
-                                            <td className="p-2 text-right text-slate-400">{row.q75.toFixed(1)}</td>
-                                            <td className="p-2 text-right text-slate-400">{row.max.toFixed(1)}</td>
+                                            <td className="p-2 text-right font-medium">{fmt(row.mean, 2)}</td>
+                                            <td className="p-2 text-right font-medium">{fmt(row.median, 2)}</td>
+                                            <td className="p-2 text-right text-slate-600">{fmt(row.std, 2)}</td>
+                                            <td className="p-2 text-right text-slate-400">{fmt(row.min, 1)}</td>
+                                            <td className="p-2 text-right text-slate-400">{fmt(row.q25, 1)}</td>
+                                            <td className="p-2 text-right text-slate-400">{fmt(row.q75, 1)}</td>
+                                            <td className="p-2 text-right text-slate-400">{fmt(row.max, 1)}</td>
                                             <td className={`p-2 text-right border-l ${Math.abs(row.skewness) > 1 ? "text-red-500 font-bold" : "text-slate-500"}`}>
-                                                {row.skewness.toFixed(2)}
+                                                {fmt(row.skewness, 2)}
                                             </td>
-                                            <td className="p-2 text-right text-slate-500">{row.kurtosis.toFixed(2)}</td>
+                                            <td className="p-2 text-right text-slate-500">{fmt(row.kurtosis, 2)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

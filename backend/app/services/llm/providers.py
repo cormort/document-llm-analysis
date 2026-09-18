@@ -12,7 +12,10 @@ from typing import AsyncGenerator
 import google.generativeai as genai
 import requests
 import structlog
+
+from app.core.config import settings
 from app.core.metrics import LLM_TOKEN_USAGE_TOTAL
+from app.utils.url_guard import UnsafeUrlError, validate_outbound_url
 
 logger = structlog.get_logger()
 
@@ -243,21 +246,25 @@ class LLMProviders:
         """Local LLM API call (OpenAI-compatible)."""
         # Normalize provider name to handle case/whitespace variations
         normalized_provider = provider.strip().lower()
-        base_url = (local_url or "").rstrip("/")
+        try:
+            base_url = validate_outbound_url(
+                local_url,
+                allow_private=settings.ALLOW_PRIVATE_LLM_URLS,
+                field_name="local_url",
+            )
+        except UnsafeUrlError as e:
+            logger.warning("Rejected local_url", error=str(e))
+            return f"⚠️ 不允許的 local_url：{e}"
         endpoint = f"{base_url}/chat/completions"
 
         headers = {"Content-Type": "application/json", "Connection": "close"}
 
-        effective_key = api_key_input
-        # omlx: always prefer env-configured key (frontend may send stale cloud keys)
+        # 安全：非 omlx 的 OpenAI-compatible endpoint 不附上伺服器金鑰，
+        # 避免把 GOOGLE_API_KEY 送到使用者指定的任意 URL。
         if normalized_provider == "omlx":
-            from app.core.config import settings as cfg
-
-            effective_key = cfg.OMLX_API_KEY or api_key_input or None
-
-        # omlx requires API key authentication
-        if normalized_provider == "omlx" and effective_key:
-            headers["Authorization"] = f"Bearer {effective_key}"
+            effective_key = settings.OMLX_API_KEY or api_key_input or None
+            if effective_key:
+                headers["Authorization"] = f"Bearer {effective_key}"
         payload = {
             "model": model_name,
             "messages": [
@@ -409,15 +416,26 @@ class LLMProviders:
     ) -> AsyncGenerator[str, None]:
         """Streaming implementation for OpenAI-compatible providers."""
         normalized_provider = provider.strip().lower()
-        base_url = (local_url or "").rstrip("/")
+        try:
+            base_url = validate_outbound_url(
+                local_url,
+                allow_private=settings.ALLOW_PRIVATE_LLM_URLS,
+                field_name="local_url",
+            )
+        except UnsafeUrlError as e:
+            logger.warning("Rejected local_url", error=str(e))
+            yield f"⚠️ 不允許的 local_url：{e}"
+            return
         endpoint = f"{base_url}/chat/completions"
 
         headers = {"Content-Type": "application/json"}
-        effective_key = api_key_input
+        # 安全：不要把伺服器自己的雲端金鑰（GOOGLE_API_KEY）送到使用者指定的
+        # 任意 endpoint。只有 omlx（自有金鑰）或使用者明確傳入的金鑰才會附上。
         if normalized_provider == "omlx":
-            from app.core.config import settings as cfg
-            effective_key = cfg.OMLX_API_KEY or api_key_input or None
-        
+            effective_key = settings.OMLX_API_KEY or api_key_input or None
+        else:
+            effective_key = api_key_input
+
         if effective_key:
             headers["Authorization"] = f"Bearer {effective_key}"
 
@@ -492,14 +510,20 @@ class LLMProviders:
             base_url = "https://api.openai.com/v1"
             headers = {"Authorization": f"Bearer {api_key_input}"}
         else:
-            base_url = local_url.rstrip("/")
+            try:
+                base_url = validate_outbound_url(
+                    local_url,
+                    allow_private=settings.ALLOW_PRIVATE_LLM_URLS,
+                    field_name="local_url",
+                )
+            except UnsafeUrlError as e:
+                logger.warning("Rejected local_url", error=str(e))
+                return []
             headers = {}
 
             effective_key = api_key_input
             if provider == "omlx":
-                from app.core.config import settings as cfg
-
-                effective_key = cfg.OMLX_API_KEY or api_key_input or None
+                effective_key = settings.OMLX_API_KEY or api_key_input or None
 
             # omlx requires API key authentication
             if provider == "omlx" and effective_key:

@@ -170,7 +170,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             prompt,
             **kwargs,
@@ -276,7 +276,7 @@ class LLMService:
             financial_skepticism=financial_skepticism,
         )
 
-        api_key_input = api_key or self.api_key
+        api_key_input = api_key or self._get_api_key_for_provider(provider)
 
         return await self._call_provider(
             provider,
@@ -310,7 +310,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             user_prompt,
             **kwargs,
@@ -340,7 +340,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             user_prompt,
             **kwargs,
@@ -368,7 +368,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             user_prompt,
             **kwargs,
@@ -409,7 +409,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             user_prompt,
             **kwargs,
@@ -465,7 +465,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             user_prompt,
             **kwargs,
@@ -497,7 +497,7 @@ class LLMService:
             provider,
             model_name,
             local_url,
-            self.api_key,
+            self._get_api_key_for_provider(provider),
             system_prompt,
             user_prompt,
             **kwargs,
@@ -533,7 +533,7 @@ class LLMService:
 
 請生成 Pandas 程式碼："""
 
-        api_key = kwargs.pop("api_key", self.api_key)
+        api_key = kwargs.pop("api_key", None) or self._get_api_key_for_provider(provider)
         return await self._call_provider(
             provider,
             model_name,
@@ -563,7 +563,7 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        api_key_input = api_key or self.api_key
+        api_key_input = api_key or self._get_api_key_for_provider(provider)
 
         system_prompt = """你是一位專業的文件分析助手。請根據提供的上下文內容回答問題。
 
@@ -610,7 +610,7 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        api_key_input = api_key or self.api_key
+        api_key_input = api_key or self._get_api_key_for_provider(provider)
 
         system_prompt = """你是一位專業的文件分析助手。請根據提供的上下文內容回答問題。
 
@@ -647,25 +647,49 @@ class LLMService:
     async def ai_detect_table_range(self, content, provider, model, url, **kwargs):
         system_prompt = "你是 Excel 表格分析專家。請分析內容並偵測表格範圍。"
         return await self._call_provider(
-            provider, model, url, self.api_key, system_prompt, str(content), **kwargs
+            provider,
+            model,
+            url,
+            self._get_api_key_for_provider(provider),
+            system_prompt,
+            str(content),
+            **kwargs,
         )
 
     async def ai_find_semantic_keywords(self, content, provider, model, url, **kwargs):
         system_prompt = "你是語意分析專家。請從內容中找出關鍵詞。"
         return await self._call_provider(
-            provider, model, url, self.api_key, system_prompt, str(content), **kwargs
+            provider,
+            model,
+            url,
+            self._get_api_key_for_provider(provider),
+            system_prompt,
+            str(content),
+            **kwargs,
         )
 
     async def ai_infer_formula_structure(self, content, provider, model, url, **kwargs):
         system_prompt = "你是 Excel 公式推論專家。請推論公式結構。"
         return await self._call_provider(
-            provider, model, url, self.api_key, system_prompt, str(content), **kwargs
+            provider,
+            model,
+            url,
+            self._get_api_key_for_provider(provider),
+            system_prompt,
+            str(content),
+            **kwargs,
         )
 
     async def ai_match_template(self, content, provider, model, url, **kwargs):
         system_prompt = "你是文件模板比對專家。請比對並匹配模板。"
         return await self._call_provider(
-            provider, model, url, self.api_key, system_prompt, str(content), **kwargs
+            provider,
+            model,
+            url,
+            self._get_api_key_for_provider(provider),
+            system_prompt,
+            str(content),
+            **kwargs,
         )
 
     async def ai_diagnose_validation_errors(
@@ -673,7 +697,13 @@ class LLMService:
     ):
         system_prompt = "你是資料驗證診斷專家。請診斷驗證錯誤原因。"
         return await self._call_provider(
-            provider, model, url, self.api_key, system_prompt, str(content), **kwargs
+            provider,
+            model,
+            url,
+            self._get_api_key_for_provider(provider),
+            system_prompt,
+            str(content),
+            **kwargs,
         )
 
 

@@ -18,6 +18,7 @@ interface ChatState {
     selectedDocuments: string[];
     addMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => void;
     updateLastMessage: (content: string) => void;
+    appendToLastMessage: (delta: string) => void;
     setStreaming: (isStreaming: boolean) => void;
     setSelectedDocuments: (docs: string[]) => void;
     clearMessages: () => void;
@@ -40,12 +41,25 @@ export const useChatStore = create<ChatState>((set) => ({
             ],
         })),
 
+    // 注意：不可直接改動 state 內的既有物件（會破壞 selector 相等性/ memo）
     updateLastMessage: (content) =>
         set((state) => {
-            const messages = [...state.messages];
-            if (messages.length > 0) {
-                messages[messages.length - 1].content = content;
-            }
+            if (state.messages.length === 0) return state;
+            const messages = state.messages.slice();
+            const last = messages[messages.length - 1];
+            messages[messages.length - 1] = { ...last, content };
+            return { messages };
+        }),
+
+    appendToLastMessage: (delta) =>
+        set((state) => {
+            if (state.messages.length === 0 || !delta) return state;
+            const messages = state.messages.slice();
+            const last = messages[messages.length - 1];
+            messages[messages.length - 1] = {
+                ...last,
+                content: last.content + delta,
+            };
             return { messages };
         }),
 

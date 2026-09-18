@@ -12,15 +12,11 @@ const nextConfig: NextConfig = {
 
   // Image optimization configuration
   images: {
-    // Enable image optimization
-    unoptimized: false,
-    // Allowed image domains
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-    ],
+    // 全站沒有任何 next/image 使用；優化器 + `hostname: "**"` 等於提供一個
+    // 對任意遠端網址開放的圖片代理（SSRF／雲端 metadata／流量放大）。
+    // 需要時再打開，並把 remotePatterns 收斂到實際使用的網域。
+    unoptimized: true,
+    remotePatterns: [],
     // Image sizes for responsive images
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
