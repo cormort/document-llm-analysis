@@ -33,8 +33,11 @@ FROM python:3.12-slim AS production
 WORKDIR /app
 
 # Install runtime dependencies only
+# libmagic1 是 python-magic 的系統依賴：缺少它時 app/api/upload.py 會靜默
+# 退回用副檔名猜測 MIME 類型，使「檔案內容驗證」形同虛設。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security

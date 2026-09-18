@@ -1,6 +1,5 @@
 """Tests for file resolver utilities."""
 
-import pytest
 
 from app.utils.file_resolver import (
     convert_numpy_types,
@@ -15,12 +14,45 @@ class TestResolveDataFile:
         result = resolve_data_file("nonexistent_file.csv")
         assert result is None
 
-    def test_resolve_with_absolute_path(self, tmp_path):
+    def test_resolve_with_absolute_path_outside_data_dir_is_denied(self, tmp_path):
+        """資料目錄以外的絕對路徑預設必須被拒絕（任意檔案讀取防護）。"""
         test_file = tmp_path / "test.csv"
         test_file.write_text("a,b\n1,2")
 
-        result = resolve_data_file(str(test_file))
+        assert resolve_data_file(str(test_file)) is None
+
+    def test_resolve_absolute_path_with_explicit_opt_in(self, tmp_path):
+        """需要讀外部檔案時，呼叫端必須明確 opt-in。"""
+        test_file = tmp_path / "test.csv"
+        test_file.write_text("a,b\n1,2")
+
+        result = resolve_data_file(str(test_file), allow_outside_allowed_roots=True)
         assert result == test_file
+
+    def test_resolve_rejects_path_traversal(self):
+        """`../../etc/passwd` 之類的相對路徑穿越必須被拒絕。"""
+        assert resolve_data_file("../../../../../../etc/passwd") is None
+
+    def test_resolve_rejects_absolute_system_file(self):
+        assert resolve_data_file("/etc/passwd") is None
+
+    def test_resolve_allows_file_inside_data_dir(self, tmp_path, monkeypatch):
+        """資料目錄底下的檔案仍然可以正常解析。"""
+        from app.utils import file_resolver
+
+        data_dir = tmp_path / "data" / "uploads"
+        data_dir.mkdir(parents=True)
+        target = data_dir / "ok.csv"
+        target.write_text("a,b\n1,2")
+
+        monkeypatch.setattr(
+            file_resolver, "ALLOWED_ROOTS", (tmp_path / "data",), raising=True
+        )
+        monkeypatch.setattr(
+            file_resolver, "SEARCH_PATHS", [data_dir], raising=True
+        )
+
+        assert file_resolver.resolve_data_file("ok.csv") == target
 
 
 class TestLoadDataFrame:

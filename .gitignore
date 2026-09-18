@@ -10,8 +10,13 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Python packaging dirs only (root-level); do NOT ignore frontend source.
+# `lib/` used to match frontend/src/lib/, which silently excluded the whole
+# frontend API layer (@/lib/api, @/lib/store, @/lib/utils) from the repo.
+/lib/
+/lib64/
+!frontend/src/lib/
+!frontend/src/lib/**
 parts/
 sdist/
 var/
@@ -84,4 +89,18 @@ env/
 # Executables
 *.command
 
-.github/
+# Test / coverage artifacts (must not be committed)
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# NOTE: `.github/` must NOT be ignored — doing so removed the CI workflows
+# described in the README from the repository. Use a negation if a local
+# tool needs to hide it:
+# .github/
+!.github/
+!.github/**

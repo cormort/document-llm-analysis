@@ -4,11 +4,18 @@
 提供 CORS、LLM 路由、Rate Limiting 等參數。
 """
 
+import logging
 import os
 import secrets
 from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+_DEV_SECRET_FILE = _BACKEND_ROOT / "data" / ".jwt_secret"
 
 
 class Settings(BaseSettings):
@@ -16,6 +23,13 @@ class Settings(BaseSettings):
 
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Document LLM Analysis"
+
+    # 執行環境：development / staging / production
+    ENVIRONMENT: str = "development"
+
+    # 是否允許匿名存取受保護的 API。
+    # None（預設）＝ 非 production 允許、production 不允許。
+    ALLOW_ANONYMOUS_ACCESS: bool | None = None
 
     # CORS（以逗號分隔的 URL 清單，如 http://localhost:3000,http://localhost:8501）
     BACKEND_CORS_ORIGINS: list[str] = []
@@ -53,16 +67,64 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not self.JWT_SECRET_KEY:
-            self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
-            if not self.JWT_SECRET_KEY:
-                self.JWT_SECRET_KEY = secrets.token_urlsafe(32)
-                import warnings
+            self.JWT_SECRET_KEY = self._resolve_jwt_secret()
 
-                warnings.warn(
-                    "JWT_SECRET_KEY not set. Using random key. "
-                    "Set JWT_SECRET_KEY environment variable for production.",
-                    UserWarning,
-                )
+    @property
+    def is_production(self) -> bool:
+        """是否為生產環境。"""
+        return self.ENVIRONMENT.lower() in {"production", "prod"}
+
+    @property
+    def allow_anonymous_access(self) -> bool:
+        """是否允許匿名呼叫需要認證的端點。
+
+        預設：生產環境 False、其他環境 True（可透過 ALLOW_ANONYMOUS_ACCESS 覆寫）。
+        """
+        if self.ALLOW_ANONYMOUS_ACCESS is not None:
+            return self.ALLOW_ANONYMOUS_ACCESS
+        return not self.is_production
+
+    def _resolve_jwt_secret(self) -> str:
+        """決定 JWT 簽章金鑰。
+
+        - production：沒有設定 JWT_SECRET_KEY 就直接啟動失敗（fail fast），
+          避免用隨機金鑰產生「重啟即失效 / 多 worker 互不承認」的 token。
+        - 其他環境：把隨機產生的金鑰持久化到 data/.jwt_secret（權限 600），
+          讓重啟後既有 token 仍然有效，也讓多個 worker 共用同一把金鑰。
+        """
+        env_secret = os.getenv("JWT_SECRET_KEY", "")
+        if env_secret:
+            return env_secret
+
+        if self.is_production:
+            raise RuntimeError(
+                "JWT_SECRET_KEY 未設定。生產環境必須設定固定的 JWT_SECRET_KEY，"
+                "否則 token 會在重啟後全部失效。"
+            )
+
+        try:
+            if _DEV_SECRET_FILE.exists():
+                stored = _DEV_SECRET_FILE.read_text(encoding="utf-8").strip()
+                if stored:
+                    return stored
+            _DEV_SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+            generated = secrets.token_urlsafe(32)
+            _DEV_SECRET_FILE.write_text(generated, encoding="utf-8")
+            _DEV_SECRET_FILE.chmod(0o600)
+            logger.warning(
+                "JWT_SECRET_KEY 未設定，已於 %s 產生開發用金鑰。"
+                "生產環境請改以環境變數設定。",
+                _DEV_SECRET_FILE,
+            )
+            return generated
+        except OSError:
+            # 無法寫入檔案時退回隨機金鑰（行為與舊版相同，但會記錄警告）
+            logger.warning(
+                "JWT_SECRET_KEY 未設定且無法寫入 %s，改用本次啟動的隨機金鑰；"
+                "重啟後既有 token 將失效。",
+                _DEV_SECRET_FILE,
+            )
+            return secrets.token_urlsafe(32)
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

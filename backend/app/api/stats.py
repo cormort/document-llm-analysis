@@ -1,5 +1,6 @@
 """Statistics API endpoints."""
 
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -398,33 +399,74 @@ async def interpret_stats(request: InterpretStatsRequest) -> InterpretStatsRespo
     return InterpretStatsResponse(interpretation=interp)
 
 
+# df.eval 可用的安全函式（pandas 表達式引擎支援的數學函式）
+_ALLOWED_EVAL_FUNCS: frozenset[str] = frozenset(
+    {
+        "abs",
+        "sqrt",
+        "log",
+        "log10",
+        "exp",
+        "sin",
+        "cos",
+        "tan",
+        "arcsin",
+        "arccos",
+        "arctan",
+        "sinh",
+        "cosh",
+        "tanh",
+        "minimum",
+        "maximum",
+        "floor",
+        "ceil",
+    }
+)
+_EVAL_CALL_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+MAX_EVAL_EXPRESSION_LENGTH = 200
+
+
+def _validate_eval_expression(expression: str) -> None:
+    """驗證 df.eval 的表達式。
+
+    pandas 的 `df.eval` 支援 `@name` 區域變數引用與屬性存取，
+    等於可以從「公式」跳到模組／物件圖。此端點沒有任何認證，
+    因此在交給 eval 之前必須先把這些語法擋掉。
+    """
+    expr = (expression or "").strip()
+    if not expr:
+        raise HTTPException(status_code=400, detail="Expression is empty")
+    if len(expr) > MAX_EVAL_EXPRESSION_LENGTH:
+        raise HTTPException(status_code=400, detail="Expression too long")
+    # `@` = 引用外部變數、`__` = 魔術屬性、引號/分號/換行 = 注入字串或語句
+    if "@" in expr or "__" in expr:
+        raise HTTPException(
+            status_code=400, detail="Expression must not reference external variables"
+        )
+    if any(ch in expr for ch in "\"'`;\\\n\r"):
+        raise HTTPException(
+            status_code=400, detail="Expression contains forbidden characters"
+        )
+    for func_name in _EVAL_CALL_RE.findall(expr):
+        if func_name not in _ALLOWED_EVAL_FUNCS:
+            raise HTTPException(
+                status_code=400, detail=f"Function not allowed: {func_name}"
+            )
+
+
 @router.post("/transform", response_model=TransformResponse)
 async def transform_variable(request: TransformRequest) -> TransformResponse:
     """Create a new variable using a formula expression."""
     df = load_dataframe(request.file_path)
+    if df is None:
+        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     try:
-        # Security: pd.eval is safer than eval() but still powerful.
-        # Ideally we'd restrict the local scope.
-        # Using engine='numexpr' is generally safer and faster for numerical ops.
-
-        # Safe-guard: limit expression length and chars
-        if len(request.expression) > 200:
-            raise HTTPException(status_code=400, detail="Expression too long")
+        _validate_eval_expression(request.expression)
 
         # Evaluate
         # Note: df.eval operates within the DataFrame columns namespace
         # e.g. "colA + colB"
-
-        # Check if column already exists
-        if request.new_column in df.columns:
-            # Just overwrite? Or warn? Overwrite for now.
-            pass
-
-        # Perform calculation
-        # We use assignment syntax internally: "new_col = expression"
-        # but df.eval can just return the series
-
         new_series = df.eval(request.expression)
 
         # Add to dataframe temporary to extract values/preview
@@ -966,8 +1008,13 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
 
 
 @router.post("/forecast/prophet")
-async def run_prophet_forecast(request: DiagnosticRequest) -> dict:
-    """Run Prophet time series forecasting."""
+async def prophet_forecast(request: DiagnosticRequest) -> dict:
+    """Run Prophet time series forecasting.
+
+    函式名稱刻意不叫 `run_prophet_forecast`：那個名字是從
+    `app.services.statistical_tests` 匯入的實作，若在此覆蓋會讓下方呼叫
+    到自己（TypeError），這是先前的真實 bug。
+    """
     df = load_dataframe(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")

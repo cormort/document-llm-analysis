@@ -27,6 +27,12 @@ services:
       - LLM_OMLX_URL=${LLM_OMLX_URL:-http://host.docker.internal:8000/v1}
       - REDIS_URL=redis://redis:6379/0
       - RATE_LIMIT_DEFAULT=30/minute
+      # 安全設定：預設 development（可匿名）以維持與現有前端相容。
+      # 設成 production 時務必同時提供 JWT_SECRET_KEY，否則後端會拒絕啟動。
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
+      - ALLOW_ANONYMOUS_ACCESS=${ALLOW_ANONYMOUS_ACCESS:-}
+      - JWT_ACCESS_TOKEN_EXPIRE_HOURS=${JWT_ACCESS_TOKEN_EXPIRE_HOURS:-24}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

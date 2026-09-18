@@ -1,114 +1,23 @@
 """Data Query API endpoints for executing and interpreting Pandas queries."""
 
-import ast
-import re
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from app.models.query import QueryExecuteRequest, QueryExecuteResponse
 from app.services.llm_service import llm_service
+from app.utils.code_safety import validate_code_safety
 from app.utils.file_resolver import resolve_data_file
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 EXECUTION_TIMEOUT_SECONDS = 10
-
-FORBIDDEN_PATTERNS = [
-    r"\bimport\s+os\b",
-    r"\bimport\s+subprocess\b",
-    r"\bimport\s+sys\b",
-    r"\bimport\s+shutil\b",
-    r"\bimport\s+socket\b",
-    r"\b__import__\b",
-    r"\beval\s*\(",
-    r"\bexec\s*\(",
-    r"\bcompile\s*\(",
-    r"\bopen\s*([\"']",
-    r"\.system\s*\(",
-    r"\.popen\s*\(",
-    r"\.spawn\s*\(",
-    r"\bgetattr\s*\(",
-    r"\bsetattr\s*\(",
-    r"\bdelattr\s*\(",
-    r"\b__class__\b",
-    r"\b__base__\b",
-    r"\b__mro__\b",
-    r"\b__subclasses__\b",
-    r"\b__globals__\b",
-    r"\b__code__\b",
-    r"\b__builtins__\b",
-    r"\b__dict__\b",
-    r"\blocals\s*\(",
-    r"\bglobals\s*\(",
-    r"\bvars\s*\(",
-    r"\bdir\s*\(",
-    r"\btype\s*\(",
-    r"\binput\s*\(",
-    r"\bbreakpoint\s*\(",
-]
-
-ALLOWED_NODES = (
-    ast.Module,
-    ast.Expr,
-    ast.Assign,
-    ast.AugAssign,
-    ast.Return,
-    ast.If,
-    ast.For,
-    ast.While,
-    ast.With,
-    ast.FunctionDef,
-    ast.Call,
-    ast.Attribute,
-    ast.Name,
-    ast.Constant,
-    ast.List,
-    ast.Dict,
-    ast.Tuple,
-    ast.Set,
-    ast.Subscript,
-    ast.Index,
-    ast.Slice,
-    ast.BinOp,
-    ast.UnaryOp,
-    ast.BoolOp,
-    ast.Compare,
-    ast.Lambda,
-    ast.ListComp,
-    ast.DictComp,
-    ast.SetComp,
-    ast.GeneratorExp,
-    ast.NamedExpr,
-)
-
-
-def validate_code_safety(code: str) -> tuple[bool, str]:
-    """驗證程式碼安全性，包含正則黑名單和 AST 白名單檢查。"""
-    for pattern in FORBIDDEN_PATTERNS:
-        if re.search(pattern, code):
-            return False, f"禁止使用的程式碼模式: {pattern}"
-
-    try:
-        tree = ast.parse(code)
-    except SyntaxError as e:
-        return False, f"語法錯誤: {e}"
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ALLOWED_NODES):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                return False, "不允許的 import 語句"
-            if isinstance(node, ast.Global):
-                return False, "不允許的 global 語句"
-            if isinstance(node, ast.Nonlocal):
-                return False, "不允許的 nonlocal 語句"
-            if isinstance(node, (ast.Delete, ast.Del)):
-                return False, "不允許的 del 語句"
-
-    return True, ""
-
 
 @router.post("/execute", response_model=QueryExecuteResponse)
 async def execute_query(request: QueryExecuteRequest) -> QueryExecuteResponse:
@@ -128,43 +37,38 @@ async def execute_query(request: QueryExecuteRequest) -> QueryExecuteResponse:
             )
 
         if file_path.suffix.lower() == ".csv":
-            df = pd.read_csv(file_path)
+            df = await run_in_threadpool(pd.read_csv, file_path)
         elif file_path.suffix.lower() in [".xls", ".xlsx"]:
-            df = pd.read_excel(file_path)
+            df = await run_in_threadpool(pd.read_excel, file_path)
         else:
             return QueryExecuteResponse(success=False, error="不支援的文件格式")
 
         def execute_code():
             exec_globals = {"pd": pd, "df": df, "result": None}
-            exec_globals_copy = exec_globals.copy()
 
             try:
-                exec(request.pandas_code, {"__builtins__": {}}, exec_globals_copy)
-                result = exec_globals_copy.get("result")
-
-                if result is None:
-                    try:
-                        result = eval(
-                            request.pandas_code,
-                            {"__builtins__": {}},
-                            {"pd": pd, "df": df},
-                        )
-                    except Exception:
-                        return None
-
-                return result
+                # 注意：`exec` 不是真正的沙箱，validate_code_safety 只是
+                # 第一層防護。此端點必須搭配認證使用（見 app/api/deps.py），
+                # 且生產環境建議改用 /api/query/nl-to-sql（DuckDB）流程。
+                exec(request.pandas_code, {"__builtins__": {}}, exec_globals)
+                return exec_globals.get("result")
             except Exception as e:
-                raise RuntimeError(f"執行錯誤: {str(e)}") from e
+                raise RuntimeError(f"執行錯誤: {type(e).__name__}: {e}") from e
 
         executor = ThreadPoolExecutor(max_workers=1)
         try:
             future = executor.submit(execute_code)
             result = future.result(timeout=EXECUTION_TIMEOUT_SECONDS)
         except FuturesTimeoutError:
+            # 注意：ThreadPoolExecutor 無法真正中止執行中的執行緒，
+            # shutdown(wait=False) 只是不再等待；惡意/無窮迴圈的程式碼
+            # 仍會佔用一個執行緒直到它自己結束。
             return QueryExecuteResponse(
-                success=False, error=f"執行超時（超過 {EXECUTION_TIMEOUT_SECONDS} 秒）"
+                success=False,
+                error=f"執行超時（超過 {EXECUTION_TIMEOUT_SECONDS} 秒），已放棄等待",
             )
         except Exception as e:
+            logger.warning("查詢執行失敗", exc_info=e)
             return QueryExecuteResponse(success=False, error=str(e))
         finally:
             executor.shutdown(wait=False)
@@ -184,7 +88,7 @@ async def execute_query(request: QueryExecuteRequest) -> QueryExecuteResponse:
         elif isinstance(result, pd.Series):
             return QueryExecuteResponse(
                 success=True,
-                data=result.to_frame().to_dict(orient="records"),
+                data=result.head(100).to_frame().to_dict(orient="records"),
                 summary=f"Result count: {len(result)}",
             )
         else:
@@ -193,8 +97,9 @@ async def execute_query(request: QueryExecuteRequest) -> QueryExecuteResponse:
             )
 
     except Exception as exec_err:
+        logger.exception("查詢端點未預期的錯誤")
         return QueryExecuteResponse(
-            success=False, error=f"Python 執行錯誤: {str(exec_err)}"
+            success=False, error=f"Python 執行錯誤: {type(exec_err).__name__}"
         )
 
 

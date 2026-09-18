@@ -29,31 +29,72 @@ SEARCH_PATHS = [
 ]
 
 
-def resolve_data_file(file_path_str: str) -> Path | None:
+def _is_within(path: Path, root: Path) -> bool:
+    """判斷 path 是否位於 root 之內（解析符號連結後）。
+
+    用於防止 `../` 路徑穿越與指向系統檔案的絕對路徑。
+    """
+    try:
+        path.resolve().relative_to(root.resolve())
+    except (ValueError, OSError):
+        return False
+    return True
+
+
+# 只允許存取這些根目錄底下的資料檔
+ALLOWED_ROOTS: tuple[Path, ...] = (
+    ABS_DATA_DIR,
+    ABS_UPLOAD_DIR,
+    (Path.cwd() / "data").resolve(),
+    (Path.cwd() / "backend" / "data").resolve(),
+)
+
+
+def resolve_data_file(
+    file_path_str: str, *, allow_outside_allowed_roots: bool = False
+) -> Path | None:
     """解析資料檔案路徑。
 
     搜尋多個可能目錄，回傳存在的檔案路徑。
 
+    安全限制：預設只允許解析 `ALLOWED_ROOTS`（資料目錄）底下的檔案，
+    避免 API 被當成任意檔案讀取器（`../../etc/passwd`、`/etc/shadow`）。
+    若確實需要讀取其他位置的檔案（例如 CLI 工具），
+    呼叫端必須明確傳入 `allow_outside_allowed_roots=True`。
+
     Args:
         file_path_str: 檔案路徑字串
+        allow_outside_allowed_roots: 是否允許資料目錄以外的路徑
 
     Returns:
-        Path 物件，如果找不到則回傳 None
+        Path 物件，如果找不到或不被允許則回傳 None
     """
-    file_path = Path(file_path_str)
+    if not file_path_str or not str(file_path_str).strip():
+        return None
 
-    if file_path.is_absolute() and file_path.exists():
-        return file_path
+    file_path = Path(str(file_path_str))
+
+    def _permitted(candidate: Path) -> bool:
+        if allow_outside_allowed_roots:
+            return True
+        return any(_is_within(candidate, root) for root in ALLOWED_ROOTS)
+
+    if file_path.is_absolute():
+        if file_path.exists() and _permitted(file_path):
+            return file_path
+        return None
 
     for search_dir in SEARCH_PATHS:
         candidate = search_dir / file_path_str
-        if candidate.exists():
+        # 相對路徑不得逃出它被解析的搜尋目錄
+        if candidate.exists() and _is_within(candidate, search_dir):
             return candidate
 
-    if file_path.exists():
+    if file_path.exists() and _permitted(file_path):
         return file_path
 
     return None
+
 
 
 def load_dataframe(file_path_str: str) -> pd.DataFrame | None:

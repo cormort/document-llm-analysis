@@ -13,6 +13,7 @@ Features:
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,36 @@ import duckdb
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# DuckDB 識別字（表名/欄名）只允許英數與底線；
+# 檔名可能含 `;`、`(`、空白等字元，直接內插會造成 SQL injection。
+_IDENTIFIER_UNSAFE = re.compile(r"[^0-9A-Za-z_]")
+
+# 使用者／LLM 提供的 SQL 只允許讀取，禁止 DDL、檔案存取與多語句
+_FORBIDDEN_SQL_KEYWORDS = re.compile(
+    r"\b(attach|detach|copy|install|load|pragma|create|drop|alter|insert|update|"
+    r"delete|truncate|export|import|call|set|reset|vacuum|begin|commit|rollback)\b",
+    re.IGNORECASE,
+)
+
+
+def sanitize_identifier(name: str) -> str:
+    """把任意字串轉成安全的 SQL 識別字。
+
+    `my data;DROP TABLE x` → `my_data_DROP_TABLE_x`
+    """
+    cleaned = _IDENTIFIER_UNSAFE.sub("_", name).strip("_")
+    if not cleaned:
+        cleaned = "table"
+    if cleaned[0].isdigit():
+        cleaned = f"t_{cleaned}"
+    return cleaned
+
+
+def quote_identifier(name: str) -> str:
+    """以雙引號包裹（已 sanitize 的）識別字。"""
+    return f'"{sanitize_identifier(name)}"'
+
 
 
 class DuckDBService:
@@ -59,28 +90,34 @@ class DuckDBService:
 
         # Generate table name from filename if not provided
         if table_name is None:
-            # Sanitize filename for SQL table name
-            table_name = path.stem.replace("-", "_").replace(" ", "_").lower()
-            # Ensure it starts with a letter
-            if table_name[0].isdigit():
-                table_name = f"t_{table_name}"
+            table_name = sanitize_identifier(path.stem)
+        else:
+            # 即使是呼叫端提供的表名也一律 sanitize，避免 SQL injection
+            table_name = sanitize_identifier(table_name)
 
+        identifier = quote_identifier(table_name)
         suffix = path.suffix.lower()
         try:
             if suffix == ".csv":
                 self.conn.execute(
-                    f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_csv_auto(?)",
+                    f"CREATE OR REPLACE TABLE {identifier} "
+                    f"AS SELECT * FROM read_csv_auto(?)",
                     [str(path)],
                 )
             elif suffix in [".xlsx", ".xls"]:
                 # DuckDB can read Excel via spatial extension or we load via pandas
                 df = pd.read_excel(path)
-                self.conn.execute(
-                    f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df"
-                )
+                self.conn.register("_excel_df", df)
+                try:
+                    self.conn.execute(
+                        f"CREATE OR REPLACE TABLE {identifier} AS SELECT * FROM _excel_df"
+                    )
+                finally:
+                    self.conn.unregister("_excel_df")
             elif suffix == ".json":
                 self.conn.execute(
-                    f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_json_auto(?)",
+                    f"CREATE OR REPLACE TABLE {identifier} "
+                    f"AS SELECT * FROM read_json_auto(?)",
                     [str(path)],
                 )
             else:
@@ -94,16 +131,20 @@ class DuckDBService:
             logger.error(f"Failed to load {file_path}: {e}")
             raise
 
-    def execute_sql(self, sql: str) -> pd.DataFrame:
+    def execute_sql(self, sql: str, *, read_only: bool = True) -> pd.DataFrame:
         """
         Execute a SQL query and return results as DataFrame.
 
         Args:
             sql: SQL query string
+            read_only: 拒絕 DDL/DML、檔案存取與多語句（預設 True）。
+                只有在內部已知安全的載入流程才應設為 False。
 
         Returns:
             Query results as pandas DataFrame
         """
+        if read_only:
+            self._assert_read_only_sql(sql)
         try:
             result = self.conn.execute(sql).fetchdf()
             logger.debug(f"Executed SQL: {sql[:100]}...")
@@ -111,6 +152,24 @@ class DuckDBService:
         except Exception as e:
             logger.error(f"SQL execution error: {e}")
             raise
+
+    @staticmethod
+    def _assert_read_only_sql(sql: str) -> None:
+        """粗略阻擋會改寫資料或存取檔案的 SQL。
+
+        DuckDB 允許 `COPY ... TO`、`read_csv('/etc/passwd')`、`ATTACH` 等，
+        對外開放的端點不能讓使用者直接送出這些語句。
+        """
+        if not sql or not sql.strip():
+            raise ValueError("SQL 不可為空")
+        # 多語句（`;` 分隔）一律拒絕
+        if ";" in sql.rstrip().rstrip(";"):
+            raise ValueError("不允許多個 SQL 語句")
+        if _FORBIDDEN_SQL_KEYWORDS.search(sql):
+            raise ValueError("查詢包含不允許的 SQL 關鍵字")
+        if "read_" in sql.lower() or "glob(" in sql.lower():
+            raise ValueError("查詢不可直接存取外部檔案")
+
 
     def get_table_schema(self, table_name: str) -> list[dict[str, Any]]:
         """
@@ -123,9 +182,7 @@ class DuckDBService:
             List of column info dicts with 'name', 'type', 'nullable'
         """
         try:
-            result = self.conn.execute(
-                f"DESCRIBE {table_name}"
-            ).fetchdf()
+            result = self.conn.execute(f"DESCRIBE {quote_identifier(table_name)}").fetchdf()
             return result.to_dict(orient="records")
         except Exception as e:
             logger.error(f"Failed to get schema for {table_name}: {e}")
@@ -133,12 +190,16 @@ class DuckDBService:
 
     def get_table_sample(self, table_name: str, limit: int = 5) -> pd.DataFrame:
         """Get sample rows from a table."""
-        return self.execute_sql(f"SELECT * FROM {table_name} LIMIT {limit}")
+        safe_limit = max(1, min(int(limit), 1000))
+        return self.execute_sql(
+            f"SELECT * FROM {quote_identifier(table_name)} LIMIT {safe_limit}",
+            read_only=False,
+        )
 
     def get_table_stats(self, table_name: str) -> dict[str, Any]:
         """Get basic statistics for a table."""
         row_count = self.conn.execute(
-            f"SELECT COUNT(*) as cnt FROM {table_name}"
+            f"SELECT COUNT(*) as cnt FROM {quote_identifier(table_name)}"
         ).fetchone()[0]
 
         schema = self.get_table_schema(table_name)

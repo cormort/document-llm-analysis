@@ -75,6 +75,7 @@ class AstuteRAGService:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """
         Extract relevant knowledge from LLM's internal knowledge base.
@@ -120,11 +121,12 @@ class AstuteRAGService:
 
         try:
             result = await llm_service.analyze_text(
-                text="",
+                text_content="",
                 user_instruction=prompt,
                 provider=provider,
                 model_name=model_name,
                 local_url=local_url,
+                api_key=api_key,
             )
 
             # Parse JSON
@@ -224,6 +226,7 @@ class AstuteRAGService:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """
         Generate final answer based on consolidated, reliability-assessed knowledge.
@@ -296,11 +299,12 @@ class AstuteRAGService:
 
         try:
             answer = await llm_service.analyze_text(
-                text="",
+                text_content="",
                 user_instruction=answer_prompt,
                 provider=provider,
                 model_name=model_name,
                 local_url=local_url,
+                api_key=api_key,
             )
 
             # Calculate overall confidence
@@ -364,6 +368,7 @@ class AstuteRAGService:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
         force_retrieval: bool = False,
     ) -> dict[str, Any]:
         """
@@ -399,6 +404,7 @@ class AstuteRAGService:
             provider=provider,
             model_name=model_name,
             local_url=local_url,
+            api_key=api_key,
         )
 
         # Step 2: Decide on retrieval
@@ -471,6 +477,7 @@ class AstuteRAGService:
             provider=provider,
             model_name=model_name,
             local_url=local_url,
+            api_key=api_key,
         )
 
         # Add metadata
