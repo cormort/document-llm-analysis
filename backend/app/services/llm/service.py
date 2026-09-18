@@ -3,11 +3,9 @@ LLM Service - Main Integration Module
 Consolidated AI service supporting multiple providers and advanced analysis tasks.
 """
 
-import asyncio
-import datetime
-import hashlib
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import google.generativeai as genai
 import structlog
@@ -242,7 +240,6 @@ class LLMService:
         api_key=None,
         **kwargs,
     ):
-        import os
 
         # Backward compatibility for 'text' parameter
         if text_content is None:
@@ -260,10 +257,8 @@ class LLMService:
         max_chars = int(available_tokens * 1.5)
 
         file_name = "text_input"
-        truncated = False
 
         if len(text_content) > max_chars:
-            truncated = True
             text_content = (
                 text_content[:max_chars]
                 + f"\n\n...(內容已截斷至 {max_chars} 字元以符合模型限制)..."

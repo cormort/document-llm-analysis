@@ -1,6 +1,7 @@
 """Tests for authentication API endpoints."""
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,7 +10,6 @@ from app.api.auth import router
 from app.core.database import Base, get_db
 from app.core.security import get_password_hash
 from app.models.user import User
-from fastapi import FastAPI
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 

@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-// API Base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
+import {
+    listMcpServers,
+    mcpConvertToMarkdown,
+    mcpWebSearch,
+    MCPServerInfo,
+    WebSearchResult,
+} from "@/lib/api";
 
 interface MCPServer {
     name: string;
@@ -38,15 +42,11 @@ export function MCPToolsPanel({ className }: { className?: string }) {
     const [markdownResult, setMarkdownResult] = useState("");
     const [isConverting, setIsConverting] = useState(false);
 
-    // Fetch available MCP servers
+    // Fetch available MCP servers（改走 @/lib/api，會自動帶上 Bearer token）
     const fetchServers = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api/mcp/servers`);
-            const data = await res.json();
-            if (data.success) {
-                setServers(data.servers || []);
-            }
+            setServers(await listMcpServers());
         } catch (error) {
             console.error("Failed to fetch MCP servers:", error);
         } finally {
@@ -65,19 +65,13 @@ export function MCPToolsPanel({ className }: { className?: string }) {
         setSearchResults([]);
 
         try {
-            const res = await fetch(`${API_BASE}/api/mcp/web-search`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            setSearchResults(
+                await mcpWebSearch({
                     query: searchQuery,
                     engine: searchEngine,
                     limit: 10,
-                }),
-            });
-            const data = await res.json();
-            if (data.success && data.results) {
-                setSearchResults(data.results);
-            }
+                })
+            );
         } catch (error) {
             console.error("Search failed:", error);
         } finally {
@@ -92,20 +86,12 @@ export function MCPToolsPanel({ className }: { className?: string }) {
         setMarkdownResult("");
 
         try {
-            const res = await fetch(`${API_BASE}/api/mcp/convert-to-markdown`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ uri: convertUrl }),
-            });
-            const data = await res.json();
-            if (data.success && data.markdown) {
-                setMarkdownResult(data.markdown);
-            } else {
-                setMarkdownResult(`Error: ${data.error || "Conversion failed"}`);
-            }
+            setMarkdownResult(await mcpConvertToMarkdown(convertUrl));
         } catch (error) {
             console.error("Convert failed:", error);
-            setMarkdownResult("Error: Conversion failed");
+            setMarkdownResult(
+                `Error: ${error instanceof Error ? error.message : "Conversion failed"}`
+            );
         } finally {
             setIsConverting(false);
         }

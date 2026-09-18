@@ -1,11 +1,15 @@
 """IP 存取控制資料模型。"""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:  # pragma: no cover - SQLAlchemy 以字串解析 User
+    from app.models.user import User
 
 
 class IPWhitelist(Base):

@@ -471,7 +471,7 @@ def run_linear_regression(
 
     r_squared = model.score(X, y)
 
-    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_)}
+    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_, strict=False)}
     coefficients["intercept"] = float(model.intercept_)
 
     y_pred = model.predict(X)
@@ -533,7 +533,7 @@ def run_logistic_regression(
     y_pred = model.predict(X)
     accuracy = float(np.mean(y_pred == y))
 
-    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_[0])}
+    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_[0], strict=False)}
     coefficients["intercept"] = float(model.intercept_[0])
 
     return {

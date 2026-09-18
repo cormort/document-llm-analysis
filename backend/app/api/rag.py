@@ -1,6 +1,5 @@
 """RAG API endpoints with SSE streaming support."""
 
-import asyncio
 import json
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -9,7 +8,6 @@ from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.text_cleaner import clean_rag_content
-
 from app.models.rag import (
     DocumentInfo,
     RAGIndexRequest,
@@ -301,7 +299,9 @@ async def reindex_document(collection_name: str) -> dict[str, str | list[str] | 
 
 # ========== Astute RAG Endpoints ==========
 
-from app.models.rag import (
+# 這些 import 刻意留在檔案中段：astute_rag_service 會回頭 import rag_service，
+# 放到檔案頂部會造成循環 import。
+from app.models.rag import (  # noqa: E402
     AstuteRAGQueryRequest,
     AstuteRAGQueryResponse,
     ConflictInfo,
@@ -311,7 +311,7 @@ from app.models.rag import (
     VerifyAnswerRequest,
     VerifyAnswerResponse,
 )
-from app.services.astute_rag_service import astute_rag_service
+from app.services.astute_rag_service import astute_rag_service  # noqa: E402
 
 
 @router.post("/astute/query", response_model=AstuteRAGQueryResponse)

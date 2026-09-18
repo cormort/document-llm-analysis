@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 import structlog
+
 from app.services.rag_service import rag_service
 
 logger = structlog.get_logger()
@@ -81,8 +82,10 @@ class ProjectService:
         """Update project info"""
         for proj in self.projects:
             if proj['id'] == project_id:
-                if name: proj['name'] = name
-                if description is not None: proj['description'] = description
+                if name:
+                    proj['name'] = name
+                if description is not None:
+                    proj['description'] = description
                 proj['updated_at'] = datetime.now().isoformat()
                 self._save_projects()
                 return True
@@ -126,7 +129,8 @@ class ProjectService:
     def get_project_stats(self, project_id: str) -> dict:
         """Get project statistics"""
         proj = self.get_project(project_id)
-        if not proj: return {}
+        if not proj:
+            return {}
         
         collections = proj.get('collections', [])
         total_chunks = 0

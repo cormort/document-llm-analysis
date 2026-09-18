@@ -1,6 +1,6 @@
 """用戶管理 API 端點。"""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -100,7 +100,7 @@ def update_user(
     if user_data.is_admin is not None and current_user.is_admin:
         user.is_admin = user_data.is_admin
 
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(user)
     return user

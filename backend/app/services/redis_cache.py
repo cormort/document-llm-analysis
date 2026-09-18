@@ -13,7 +13,7 @@ import hashlib
 import json
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import structlog
@@ -26,7 +26,7 @@ class RedisCache:
 
     def __init__(
         self,
-        redis_url: Optional[str] = None,
+        redis_url: str | None = None,
         key_prefix: str = "doc_llm:",
         similarity_threshold: float = 0.95,
         ttl_seconds: int = 3600,
@@ -121,7 +121,7 @@ class RedisCache:
         prompt: str,
         system_prompt: str = "",
         model: str = "",
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """查詢快取。
 
         Args:

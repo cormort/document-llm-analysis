@@ -7,13 +7,13 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 
-logger = structlog.get_logger(__name__)
-
 from app.models.reports import ReportGenerateRequest, ReportResponse, SkillInfo
 from app.services.llm_service import llm_service
 from app.services.report_exporter import generate_docx_report
 from app.services.skills_registry import REPORT_TEMPLATES, SKILLS, get_skills_by_ids
 from app.utils.file_resolver import resolve_data_file
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 

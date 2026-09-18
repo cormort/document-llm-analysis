@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, FormEvent } from "react";
+import { memo, useRef, useState, FormEvent } from "react";
 import {
     Send,
     Bot,
@@ -27,7 +27,15 @@ interface ChatInterfaceProps {
     mode?: "agent" | "rag";
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+/**
+ * `memo` 讓串流更新（每幀一次）只重繪最後一則訊息，
+ * 而不是整個訊息列表 —— 長對話時這是最明顯的效能差異。
+ */
+const MessageBubble = memo(function MessageBubble({
+    message,
+}: {
+    message: ChatMessage;
+}) {
     const isUser = message.role === "user";
 
     return (
@@ -58,7 +66,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             </div>
         </div>
     );
-}
+});
 
 function StreamingIndicator() {
     return (

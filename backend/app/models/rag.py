@@ -2,8 +2,9 @@
 
 from typing import Any
 
-from app.models.llm import LLMConfig
 from pydantic import BaseModel, Field
+
+from app.models.llm import LLMConfig
 
 
 class RAGQueryRequest(BaseModel):

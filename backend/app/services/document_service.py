@@ -100,9 +100,9 @@ class DocumentExtractionService:
                     # 取得表格邊界框
                     table_bboxes = [t.bbox for t in page.find_tables()]
 
-                    def not_within_any_table(obj):
+                    def not_within_any_table(obj, _bboxes=table_bboxes):
                         """Check if object is outside all table bounding boxes."""
-                        for bbox in table_bboxes:
+                        for bbox in _bboxes:
                             if (
                                 obj["x0"] >= bbox[0]
                                 and obj["x1"] <= bbox[2]

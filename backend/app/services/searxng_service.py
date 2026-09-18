@@ -7,6 +7,7 @@ from typing import Any
 
 import requests
 import structlog
+
 from app.services.llm_service import llm_service
 
 logger = structlog.get_logger()
@@ -59,9 +60,12 @@ class SearXNGService:
         return 50
 
     def _get_credibility_label(self, score: int) -> str:
-        if score >= 90: return "🟢"
-        elif score >= 70: return "🟡"
-        else: return "🔴"
+        if score >= 90:
+            return "🟢"
+        elif score >= 70:
+            return "🟡"
+        else:
+            return "🔴"
 
     def search(
         self,
@@ -229,7 +233,8 @@ class SearXNGService:
 
     async def summarize_results(self, results: list[dict]) -> str:
         """Summarize results using LLM (Async)"""
-        if not results: return "No results to summarize."
+        if not results:
+            return "No results to summarize."
         
         contents = "\n---\n".join([
             f"Source {i+1}: {r.get('title', '')}\n{r.get('content', '')}"
@@ -273,7 +278,8 @@ class SearXNGService:
                     sources_searched.extend(result.get("sources_searched", []))
             elif use_cache:
                 result = self.search_with_cache(q)
-                if result.get("from_cache"): from_cache = True
+                if result.get("from_cache"):
+                    from_cache = True
                 if result['success']:
                     all_results.extend(result["results"])
             else:

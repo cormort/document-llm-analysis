@@ -12,10 +12,11 @@ import numpy as np
 import openpyxl
 import pandas as pd
 import structlog
-from app.services.llm_service import llm_service
 
 # Import backend services/utils
 from openpyxl.utils import range_boundaries
+
+from app.services.llm_service import llm_service
 
 logger = structlog.get_logger()
 

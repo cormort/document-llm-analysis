@@ -1,5 +1,5 @@
-from typing import Annotated, List, Optional
 from langchain_core.tools import tool
+
 from app.services.rag_service import RAGService
 
 # Singleton instance - in a real app this might be dependency injected
@@ -8,7 +8,7 @@ rag_service = RAGService()
 @tool
 async def retrieve_documents(
     query: str,
-    collection_names: Optional[List[str]] = None,
+    collection_names: list[str] | None = None,
     n_results: int = 5
 ) -> str:
     """
@@ -38,7 +38,7 @@ async def retrieve_documents(
             return "No relevant documents found."
             
         formatted_results = []
-        for i, res in enumerate(results, 1):
+        for _i, res in enumerate(results, 1):
             content = res.get('content', '')
             source = res.get('metadata', {}).get('file_name', 'Unknown')
             formatted_results.append(f"[Source: {source}]\n{content}\n")

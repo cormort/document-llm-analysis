@@ -1,8 +1,6 @@
 """統計測試模組 Tests."""
 
-import numpy as np
 import pandas as pd
-import pytest
 
 from app.services.statistical_tests import (
     detect_outliers_iqr,

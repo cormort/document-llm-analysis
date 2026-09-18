@@ -5,36 +5,18 @@ import { Card } from "@/components/ui/card";
 import { Lightbulb, FileText, Activity, Loader2, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
-
-
-interface Document {
-  file_name: string;
-  indexed_at: string;
-  chunk_count: number;
-}
+import { listDocuments, DocumentInfo } from "@/lib/api";
 
 export function RightPanel() {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const { selectedDocuments, toggleDocumentSelection } = useAppStore();
 
   useEffect(() => {
     async function fetchDocuments() {
       try {
-        const response = await fetch("/api/rag/documents");
-        if (response.ok) {
-          const data = await response.json();
-          // Assuming the API returns a list of strings or objects. ADJUST based on actual API response.
-          // If API returns strings: data.map((name, i) => ({ id: i, filename: name }))
-          // If API returns { documents: [...] }: data.documents
-          
-          // Based on previous knowledge of rag.py, likely returns list of objects or strings.
-          // Let's assume list of objects with 'filename' or similar for safety, or handle both.
-          
-          if (Array.isArray(data)) {
-             setDocuments(data);
-          }
-        }
+        // 走 @/lib/api：統一帶上 Bearer token 與錯誤處理
+        setDocuments(await listDocuments());
       } catch (error) {
         console.error("Failed to fetch documents", error);
       } finally {

@@ -10,8 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 import structlog
 
-from app.core.metrics import CHROMADB_QUERY_LATENCY_SECONDS
-
 # 重量級依賴（chromadb / torch / sentence-transformers / 壓縮器 / 切塊器）
 # 一律在真正需要時才載入，讓這個模組（以及整個 rag 子套件）可以在沒有
 # ML 堆疊的環境被 import —— 例如只測搜尋邏輯的單元測試。

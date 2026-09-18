@@ -860,6 +860,63 @@ export async function downloadReportDocx(
   window.URL.revokeObjectURL(url);
 }
 
+/* ----------------------------- MCP -------------------------------- */
+
+export interface MCPServerInfo {
+  name: string;
+  description: string;
+  enabled: boolean;
+  connected: boolean;
+  command: string;
+}
+
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export async function listMcpServers(
+  signal?: AbortSignal
+): Promise<MCPServerInfo[]> {
+  const res = await apiFetch<{ success: boolean; servers: MCPServerInfo[] }>(
+    "/api/mcp/servers",
+    { signal }
+  );
+  return res.servers ?? [];
+}
+
+export async function mcpWebSearch(
+  params: { query: string; engine?: string; limit?: number },
+  signal?: AbortSignal
+): Promise<WebSearchResult[]> {
+  const res = await apiFetch<{ success: boolean; results: WebSearchResult[] }>(
+    "/api/mcp/web-search",
+    {
+      method: "POST",
+      json: { engine: "duckduckgo", limit: 10, ...params },
+      signal,
+    }
+  );
+  return res.results ?? [];
+}
+
+export async function mcpConvertToMarkdown(
+  uri: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const res = await apiFetch<{
+    success: boolean;
+    markdown?: string | null;
+    error?: string | null;
+  }>("/api/mcp/convert-to-markdown", { method: "POST", json: { uri }, signal });
+
+  if (!res.success) {
+    throw new ApiError(res.error || "Conversion failed", 400, res);
+  }
+  return res.markdown ?? "";
+}
+
 /* ---------------------------- 串流 -------------------------------- */
 
 export interface RAGStreamRequest {

@@ -12,17 +12,13 @@ Features:
 """
 
 import hashlib
-import json
 import os
 import time
-from typing import Any, Optional
 
 import numpy as np
 import structlog
 from diskcache import FanoutCache
 from sentence_transformers import SentenceTransformer
-
-from app.core.config import settings
 
 logger = structlog.get_logger()
 
@@ -68,7 +64,7 @@ class SemanticCache:
             size_limit=500 * 1024 * 1024,
         )
 
-        self._embedder: Optional[SentenceTransformer] = None
+        self._embedder: SentenceTransformer | None = None
         self._embedder_name = "BAAI/bge-m3"
         self._initialized = False
 
@@ -131,7 +127,7 @@ class SemanticCache:
         prompt: str,
         system_prompt: str = "",
         model: str = "",
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """查詢快取。
 
         使用語義相似度比對，而非精確匹配。

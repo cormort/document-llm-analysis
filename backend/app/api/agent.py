@@ -1,12 +1,13 @@
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from app.agent.graph import graph
 from fastapi import APIRouter
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+
+from app.agent.graph import graph
 
 router = APIRouter()
 

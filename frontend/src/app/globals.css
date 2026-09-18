@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* MarkdownRenderer / 報告頁面使用了 prose 類別；沒有這個 plugin 時
+   `prose` 完全不會產生任何樣式（先前是靜默失效）。 */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

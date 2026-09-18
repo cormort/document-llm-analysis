@@ -74,7 +74,8 @@ class GraphRAGService:
         # 2. Process Entities
         for ent in entities:
             name = ent.get("name", "").strip()
-            if not name: continue
+            if not name:
+                continue
             
             # Entity Node
             if name not in self.graph:
@@ -97,7 +98,8 @@ class GraphRAGService:
             obj = rel.get("object", "").strip()
             rel_text = rel.get("relation", "").strip()
             
-            if not sub or not obj: continue
+            if not sub or not obj:
+                continue
             
             # Ensure nodes exist
             for node in [sub, obj]:
@@ -132,7 +134,8 @@ class GraphRAGService:
         queue = collections.deque(seed_entities)
         
         for _ in range(max_steps):
-            if not queue: break
+            if not queue:
+                break
             level_size = len(queue)
             for _ in range(level_size):
                 u = queue.popleft()
@@ -144,7 +147,8 @@ class GraphRAGService:
                     
                     # Edge Rescaling
                     w_prime = max(0, (w - c) / (1 - c)) if w > c else 0
-                    if w_prime == 0: continue
+                    if w_prime == 0:
+                        continue
                     
                     # Propagation
                     delta = ai * w_prime * decay

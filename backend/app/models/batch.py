@@ -1,7 +1,8 @@
 """Pydantic models for Batch Analysis API."""
 
-from app.models.llm import LLMConfig
 from pydantic import BaseModel, Field
+
+from app.models.llm import LLMConfig
 
 
 class BatchAnalyzeRequest(BaseModel):

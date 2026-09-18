@@ -4,11 +4,11 @@
 """
 
 import asyncio
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any
-import uuid
 
 
 class QueueStatus(str, Enum):
@@ -87,7 +87,7 @@ class LLMQueueService:
         try:
             await asyncio.wait_for(item.event.wait(), timeout=self.timeout_seconds)
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             async with self._lock:
                 if item in self.queue:
                     self.queue.remove(item)

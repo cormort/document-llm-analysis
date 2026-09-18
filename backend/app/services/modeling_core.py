@@ -1,17 +1,29 @@
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any, List, Optional
+import pandas as pd
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    auc,
+    confusion_matrix,
+    f1_score,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_curve,
+)
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score, mean_squared_error, accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve, auc
 from sklearn.preprocessing import LabelEncoder
+
 
 def train_linear_regression(
     df: pd.DataFrame, 
     feature_cols: list[str], 
     target_col: str, 
     test_size: float = 0.2
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Train a linear regression model.
     """
@@ -42,14 +54,14 @@ def train_linear_regression(
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
     
     # Feature Importance (Coefficients)
-    coefficients = dict(zip(feature_cols, model.coef_))
+    coefficients = dict(zip(feature_cols, model.coef_, strict=False))
     
     # Normalized Importance
     abs_coefs = np.abs(model.coef_)
     total = abs_coefs.sum() if abs_coefs.sum() > 0 else 1.0
     importance = [
         {"feature": f, "importance": float(abs_c / total)}
-        for f, abs_c in zip(feature_cols, abs_coefs)
+        for f, abs_c in zip(feature_cols, abs_coefs, strict=False)
     ]
     
     return {
@@ -69,7 +81,7 @@ def train_logistic_regression(
     feature_cols: list[str], 
     target_col: str, 
     test_size: float = 0.2
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Train a logistic regression model for classification.
     """
@@ -119,9 +131,9 @@ def train_logistic_regression(
         # Multiclass: coef_ is (n_classes, n_features) - take average abs or max?
         # For simplicity, let's take mean absolute impact
         avg_coef = np.mean(np.abs(model.coef_), axis=0)
-        coefficients = dict(zip(feature_cols, avg_coef))
+        coefficients = dict(zip(feature_cols, avg_coef, strict=False))
     else:
-        coefficients = dict(zip(feature_cols, model.coef_[0]))
+        coefficients = dict(zip(feature_cols, model.coef_[0], strict=False))
 
     # Feature Importance
     abs_coefs = np.array(list(coefficients.values()))

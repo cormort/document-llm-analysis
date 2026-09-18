@@ -1,7 +1,8 @@
 """Pydantic models for Report API requests and responses."""
 
-from app.models.llm import LLMConfig
 from pydantic import BaseModel, Field
+
+from app.models.llm import LLMConfig
 
 
 class SkillInfo(BaseModel):

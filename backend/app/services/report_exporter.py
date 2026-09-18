@@ -22,8 +22,8 @@ def generate_docx_report(title: str, content: str, output_path: str) -> str:
         The output_path of the generated file
     """
     from docx import Document
-    from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt, RGBColor
 
     doc = Document()
 

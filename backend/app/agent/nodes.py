@@ -1,12 +1,12 @@
 import structlog
-
-from app.agent.state import AgentState
-from app.agent.tools import retrieve_documents
-from app.core.config import settings
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import ToolNode
 from pydantic import SecretStr
+
+from app.agent.state import AgentState
+from app.agent.tools import retrieve_documents
+from app.core.config import settings
 
 logger = structlog.get_logger()
 

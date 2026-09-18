@@ -137,7 +137,7 @@ class ContextCompressor:
         selected_indices = set()
         current_len = 0
 
-        for idx, score in scores:
+        for idx, _score in scores:
             sentence = sentences[idx][1]
             if current_len + len(sentence) <= target_len:
                 selected_indices.add(idx)

@@ -1,7 +1,7 @@
 """行為追蹤 API 端點。"""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -73,7 +73,7 @@ def get_event_stats(
     days: int = 7,
 ) -> list[dict[str, Any]]:
     """取得事件統計（需管理員權限）。"""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     results = (
         db.query(
@@ -107,7 +107,7 @@ def list_events(
     limit: int = 100,
 ) -> list[dict[str, Any]]:
     """取得事件列表（需管理員權限）。"""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     query = select(AnalyticsEvent).filter(AnalyticsEvent.created_at >= start_date)
 
@@ -145,7 +145,7 @@ def get_my_events(
     limit: int = 100,
 ) -> list[dict[str, Any]]:
     """取得當前用戶的事件記錄。"""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     events = (
         db.execute(

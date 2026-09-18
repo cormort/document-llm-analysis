@@ -14,7 +14,6 @@ from sklearn.preprocessing import LabelEncoder
 from app.models.stats import (
     BatchReportRequest,
     BatchReportResponse,
-    ColumnFilter,
     DataPrepResponse,
     DataQualityItem,
     DatasetAnalysisRequest,
@@ -34,9 +33,9 @@ from app.models.stats import (
     ImputeRequest,
     InterpretStatsRequest,
     InterpretStatsResponse,
+    LLMConfig,
     MultivariateRequest,
     MultivariateResponse,
-    LLMConfig,
     NLToSQLRequest,
     NLToSQLResponse,
     ReportItem,
@@ -64,16 +63,16 @@ from app.services.statistical_tests import (
     run_chi_square,
     run_correlation_matrix,
     run_isolation_forest,
+    run_kmeans,
     run_kruskal,
     run_linear_regression,
     run_logistic_regression,
     run_mannwhitneyu,
+    run_pca,
     run_prophet_forecast,
     run_shapiro_wilk,
     run_ttest,
     run_wilcoxon,
-    run_pca,
-    run_kmeans,
     suggest_test,
 )
 from app.utils.file_resolver import (
@@ -213,9 +212,9 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
                     api_key=request.config.api_key,
                 )
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=f"Column not found: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Column not found: {str(e)}") from e
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     return EDAResponse(result_data=result_data, interpretation=interpretation)
 
@@ -508,7 +507,7 @@ async def transform_variable(request: TransformRequest) -> TransformResponse:
         import logging
 
         logging.exception("Transformation failed")
-        raise HTTPException(status_code=400, detail=f"Transformation failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Transformation failed: {str(e)}") from e
 
 
 @router.post("/data")
@@ -653,7 +652,7 @@ async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
             preview=preview,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/encode", response_model=DataPrepResponse)
@@ -700,7 +699,7 @@ async def encode_variable(request: EncodeRequest) -> DataPrepResponse:
             preview=preview,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ============ DuckDB SQL Query Endpoints ============
@@ -875,7 +874,7 @@ async def get_sql_schema(file_path: str) -> dict:
             ),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/filter", response_model=FilterResponse)

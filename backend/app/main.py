@@ -4,6 +4,7 @@ Provides REST API endpoints with SSE streaming for LLM and RAG services.
 Includes CORS, rate limiting, exception handling, and secure logging.
 """
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Response
@@ -38,6 +39,8 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -84,12 +87,23 @@ cors_origins: list[str] = (
     ]
 )
 
+# `allow_origins=["*"]` 搭配 `allow_credentials=True` 是無效組合：
+# 瀏覽器會直接拒絕帶 credentials 的萬用字元回應，而且等於對所有網站開放。
+# 設了萬用字元就自動關閉 credentials，並明確警告。
+_allow_credentials = True
+if "*" in cors_origins:
+    _allow_credentials = False
+    logger.warning(
+        "BACKEND_CORS_ORIGINS 設為 '*'，已自動關閉 allow_credentials。"
+        "請改為列出實際的前端來源。"
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=_allow_credentials,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
 )
 
 try:

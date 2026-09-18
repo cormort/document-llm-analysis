@@ -13,6 +13,7 @@ from enum import Enum
 from typing import Any
 
 import structlog
+
 from app.services.knowledge_consolidator import (
     KnowledgeConsolidator,
     knowledge_consolidator,

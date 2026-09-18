@@ -103,7 +103,7 @@ class RAGSearcherMixin:
             scores = await self._run_sync(
                 self.reranker.predict, pairs, show_progress_bar=False
             )
-            ranked = sorted(zip(all_results, scores), key=lambda x: x[1], reverse=True)
+            ranked = sorted(zip(all_results, scores, strict=False), key=lambda x: x[1], reverse=True)
 
             final_results = []
             for result, score in ranked[:n_results]:
@@ -139,7 +139,7 @@ class RAGSearcherMixin:
                 self.reranker.predict, pairs, show_progress_bar=False
             )
             ranked = sorted(
-                zip(initial_results, scores), key=lambda x: x[1], reverse=True
+                zip(initial_results, scores, strict=False), key=lambda x: x[1], reverse=True
             )
             final_results = []
             for result, score in ranked[:n_results]:
@@ -438,7 +438,7 @@ class RAGSearcherMixin:
                     self.reranker.predict, pairs, show_progress_bar=False
                 )
                 ranked = sorted(
-                    zip(unique_results[:30], scores), key=lambda x: x[1], reverse=True
+                    zip(unique_results[:30], scores, strict=False), key=lambda x: x[1], reverse=True
                 )
                 unique_results = []
                 for result, score in ranked:

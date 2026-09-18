@@ -189,7 +189,6 @@ async def generate_query(request: QueryRequest | FileQueryRequest) -> LLMRespons
 
         # Handle File Query
         if isinstance(request, FileQueryRequest) or hasattr(request, "file_path"):
-            import pandas as pd
 
             from app.utils.file_resolver import load_dataframe
 

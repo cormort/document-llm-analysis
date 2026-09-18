@@ -6,8 +6,8 @@ Unified interface for Gemini, OpenAI, and Local LLM providers.
 import asyncio
 import json
 import time
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
-from typing import AsyncGenerator
 
 import google.generativeai as genai
 import requests

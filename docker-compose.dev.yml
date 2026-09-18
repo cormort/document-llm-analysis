@@ -16,6 +16,9 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
+      - ALLOW_ANONYMOUS_ACCESS=${ALLOW_ANONYMOUS_ACCESS:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
@@ -51,8 +54,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
+      # 瀏覽器走同源 /api/*，由 Next.js 伺服器端 rewrite 轉發（容器內用 service name）
+      - BACKEND_URL=http://backend:8000
     depends_on:
       backend:
         condition: service_healthy
@@ -63,11 +67,12 @@ services:
   # Redis (optional, for caching)
   # ===========================================
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     container_name: doc-llm-redis-dev
     restart: unless-stopped
+    # 只綁 localhost，不暴露到區網
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_dev_data:/data
     command: redis-server --appendonly yes
