@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from app.models.batch import (
     BatchAnalyzeRequest,
@@ -14,6 +15,15 @@ from app.services.llm_service import llm_service
 from app.utils.file_resolver import load_dataframe
 
 router = APIRouter()
+
+
+async def load_dataframe_async(file_path: str):
+    """在 threadpool 中載入 DataFrame。
+
+    pandas 的解析是阻塞式 CPU/IO 工作，直接在 `async def` 端點裡呼叫會卡住
+    event loop（單一 worker 時整個服務都會被拖住）。
+    """
+    return await run_in_threadpool(load_dataframe, file_path)
 DATA_DIR = Path("data")
 
 
@@ -22,7 +32,7 @@ async def analyze_batch(request: BatchAnalyzeRequest) -> BatchAnalyzeResponse:
     """Perform batch analysis on a dataset."""
     start_time = time.time()
     try:
-        df = load_dataframe(request.file_path)
+        df = await load_dataframe_async(request.file_path)
         if df is None:
             raise HTTPException(
                 status_code=404, detail=f"檔案未找到: {request.file_path}"

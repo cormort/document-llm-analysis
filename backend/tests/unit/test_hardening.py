@@ -110,8 +110,9 @@ class TestSettingsHardening:
         assert first.JWT_SECRET_KEY == second.JWT_SECRET_KEY
         assert (tmp_path / ".jwt_secret").exists()
 
-    def test_anonymous_access_defaults(self):
-        assert Settings(ENVIRONMENT="development").allow_anonymous_access is True
+    def test_anonymous_access_is_denied_by_default(self):
+        """安全預設：預設要求認證，只有明確開啟才允許匿名。"""
+        assert Settings(ENVIRONMENT="development").allow_anonymous_access is False
         assert (
             Settings(
                 ENVIRONMENT="production", JWT_SECRET_KEY="x" * 32
@@ -120,8 +121,7 @@ class TestSettingsHardening:
         )
         assert (
             Settings(
-                ENVIRONMENT="production",
-                JWT_SECRET_KEY="x" * 32,
+                ENVIRONMENT="development",
                 ALLOW_ANONYMOUS_ACCESS=True,
             ).allow_anonymous_access
             is True

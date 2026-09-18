@@ -31,7 +31,8 @@ services:
       # 設成 production 時務必同時提供 JWT_SECRET_KEY，否則後端會拒絕啟動。
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
-      - ALLOW_ANONYMOUS_ACCESS=${ALLOW_ANONYMOUS_ACCESS:-}
+      # 安全預設為 false（需登入）；本機單人使用可設 true
+      - ALLOW_ANONYMOUS_ACCESS=${ALLOW_ANONYMOUS_ACCESS:-false}
       - JWT_ACCESS_TOKEN_EXPIRE_HOURS=${JWT_ACCESS_TOKEN_EXPIRE_HOURS:-24}
     volumes:
       - ./data:/app/data

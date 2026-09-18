@@ -19,6 +19,21 @@ def set_test_env():
     yield
 
 
+@pytest.fixture(autouse=True)
+def allow_anonymous_for_tests():
+    """單元／整合測試聚焦在業務邏輯，不逐一簽 token。
+
+    認證政策本身由 tests/unit/test_app_routes.py 專門驗證
+    （它會自行把 ALLOW_ANONYMOUS_ACCESS 切成 True/False）。
+    """
+    from app.core.config import settings
+
+    original = settings.ALLOW_ANONYMOUS_ACCESS
+    settings.ALLOW_ANONYMOUS_ACCESS = True
+    yield
+    settings.ALLOW_ANONYMOUS_ACCESS = original
+
+
 @pytest.fixture()
 def client() -> Generator[TestClient, None, None]:
     """提供 FastAPI TestClient fixture。"""

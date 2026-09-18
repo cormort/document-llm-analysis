@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import * as XLSX from "xlsx";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,8 +76,10 @@ export default function QueryPage() {
         a.click();
     };
 
-    const exportExcel = (data: Record<string, unknown>[]) => {
+    const exportExcel = async (data: Record<string, unknown>[]) => {
         if (!data.length) return;
+        // xlsx 約 400KB，改成按需載入，避免進入首屏 bundle
+        const XLSX = await import("xlsx");
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "查詢結果");

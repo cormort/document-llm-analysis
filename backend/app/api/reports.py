@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile
 import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.models.reports import ReportGenerateRequest, ReportResponse, SkillInfo
 from app.services.llm_service import llm_service
@@ -145,7 +146,7 @@ async def download_report_docx(request: dict, background_tasks: BackgroundTasks)
         temp_file.close()
 
         # Generate docx
-        generate_docx_report(title, content, output_path=temp_path)
+        await run_in_threadpool(generate_docx_report(title, content, output_path=temp_path))
 
         # Clean up temporary file after sending
         background_tasks.add_task(os.unlink, temp_path)

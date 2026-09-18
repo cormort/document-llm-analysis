@@ -18,7 +18,8 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
-      - ALLOW_ANONYMOUS_ACCESS=${ALLOW_ANONYMOUS_ACCESS:-}
+      # 安全預設為 false（需登入）；本機單人使用可設 true
+      - ALLOW_ANONYMOUS_ACCESS=${ALLOW_ANONYMOUS_ACCESS:-false}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-change-in-production}

@@ -47,6 +47,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     setup_logging()
     init_db()
+    if settings.allow_anonymous_access:
+        logger.warning(
+            "ALLOW_ANONYMOUS_ACCESS=true：所有需要認證的 API 目前允許匿名存取，"
+            "請僅在可信任的本機環境使用。"
+        )
     yield
 
 

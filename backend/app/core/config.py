@@ -28,8 +28,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # 是否允許匿名存取受保護的 API。
-    # None（預設）＝ 非 production 允許、production 不允許。
-    ALLOW_ANONYMOUS_ACCESS: bool | None = None
+    # 預設 False（安全預設）：所有需要認證的端點都必須帶 Bearer token。
+    # 本機開發若想省去登入流程，可明確設為 true，
+    # 但請勿在對外開放的環境使用。
+    ALLOW_ANONYMOUS_ACCESS: bool = False
 
     # CORS（以逗號分隔的 URL 清單，如 http://localhost:3000,http://localhost:8501）
     BACKEND_CORS_ORIGINS: list[str] = []
@@ -85,11 +87,10 @@ class Settings(BaseSettings):
     def allow_anonymous_access(self) -> bool:
         """是否允許匿名呼叫需要認證的端點。
 
-        預設：生產環境 False、其他環境 True（可透過 ALLOW_ANONYMOUS_ACCESS 覆寫）。
+        安全預設為 False（一律要求 token）。開發時若確定只在 localhost 使用，
+        可以設 `ALLOW_ANONYMOUS_ACCESS=true` 換取方便；此時啟動會印出警告。
         """
-        if self.ALLOW_ANONYMOUS_ACCESS is not None:
-            return self.ALLOW_ANONYMOUS_ACCESS
-        return not self.is_production
+        return bool(self.ALLOW_ANONYMOUS_ACCESS)
 
     def _resolve_jwt_secret(self) -> str:
         """決定 JWT 簽章金鑰。

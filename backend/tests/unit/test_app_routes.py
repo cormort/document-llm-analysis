@@ -58,18 +58,19 @@ def client():
 
 @pytest.fixture()
 def production_mode(monkeypatch):
-    """模擬 production：不允許匿名。"""
+    """強制關閉匿名（這也是現在的預設值）。"""
     monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_ACCESS", False, raising=True)
     yield
     monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_ACCESS", None, raising=True)
 
 
 def test_health_is_public(client):
+    """健康檢查永遠公開（容器 healthcheck 需要）。"""
     assert client.get("/api/health").status_code == 200
 
 
-def test_metrics_public_in_development(client):
-    """開發環境（允許匿名）時 /metrics 可讀取。"""
+def test_metrics_allowed_when_anonymous_explicitly_enabled(client):
+    """明確開啟匿名（ALLOW_ANONYMOUS_ACCESS=true）時 /metrics 可讀取。"""
     assert client.get("/metrics").status_code == 200
 
 

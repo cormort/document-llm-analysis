@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_current_user
 from app.models.llm import (
@@ -24,8 +25,18 @@ from app.models.llm import (
 from app.models.user import User
 from app.services.llm_queue import acquire_llm, release_llm
 from app.services.llm_service import llm_service
+from app.utils.file_resolver import load_dataframe
 
 router = APIRouter()
+
+
+async def load_dataframe_async(file_path: str):
+    """在 threadpool 中載入 DataFrame。
+
+    pandas 的解析是阻塞式 CPU/IO 工作，直接在 `async def` 端點裡呼叫會卡住
+    event loop（單一 worker 時整個服務都會被拖住）。
+    """
+    return await run_in_threadpool(load_dataframe, file_path)
 
 
 async def stream_response(content: str) -> AsyncGenerator[dict[str, str], None]:
@@ -189,10 +200,7 @@ async def generate_query(request: QueryRequest | FileQueryRequest) -> LLMRespons
 
         # Handle File Query
         if isinstance(request, FileQueryRequest) or hasattr(request, "file_path"):
-
-            from app.utils.file_resolver import load_dataframe
-
-            df = load_dataframe(request.file_path)
+            df = await load_dataframe_async(request.file_path)
 
             if df is not None:
                 # Prepare Schema Info

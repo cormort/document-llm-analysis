@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sklearn.preprocessing import LabelEncoder
+from starlette.concurrency import run_in_threadpool
 
 from app.models.stats import (
     BatchReportRequest,
@@ -84,10 +85,19 @@ from app.utils.file_resolver import (
 router = APIRouter()
 
 
+async def load_dataframe_async(file_path: str):
+    """在 threadpool 中載入 DataFrame。
+
+    pandas 的解析是阻塞式 CPU/IO 工作，直接在 `async def` 端點裡呼叫會卡住
+    event loop（單一 worker 時整個服務都會被拖住）。
+    """
+    return await run_in_threadpool(load_dataframe, file_path)
+
+
 @router.post("/diagnostic", response_model=DiagnosticResponse)
 async def get_diagnostic(request: DiagnosticRequest) -> DiagnosticResponse:
     """Get data quality profiling and summary stats."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -121,7 +131,7 @@ async def get_diagnostic(request: DiagnosticRequest) -> DiagnosticResponse:
 @router.post("/descriptive")
 async def get_descriptive_stats(request: DiagnosticRequest) -> dict:
     """Get detailed descriptive statistics for numeric columns."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     # Get numeric columns only
     numeric_df = df.select_dtypes(include=[np.number])
@@ -164,15 +174,15 @@ async def get_descriptive_stats(request: DiagnosticRequest) -> dict:
 @router.post("/eda", response_model=EDAResponse)
 async def perform_eda(request: EDARequest) -> EDAResponse:
     """Perform Exploratory Data Analysis (correlation, groupby, etc.)."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     result_data = None
     interpretation = None
 
     if request.analysis_type == "correlation":
-        corr_matrix = run_correlation_matrix(
+        corr_matrix = await run_in_threadpool(run_correlation_matrix(
             df, method=request.params.get("method", "pearson")
-        )
+        ))
         result_data = corr_matrix.replace({np.nan: None}).to_dict()
 
         # Auto-interpret if requested
@@ -222,7 +232,7 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
 @router.post("/test", response_model=StatTestResponse)
 async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
     """Run statistical tests (T-test, ANOVA, Shapiro)."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     test_results = {}
     interpretation = None
@@ -235,22 +245,22 @@ async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
             raise HTTPException(
                 status_code=400, detail="T-test requires exactly 2 columns"
             )
-        test_results = run_ttest(df[cols[0]], df[cols[1]])
+        test_results = await run_in_threadpool(run_ttest(df[cols[0]], df[cols[1]]))
 
     elif request.test_type == "anova":
         groups = [df[col] for col in cols]
-        test_results = run_anova(*groups)
+        test_results = await run_in_threadpool(run_anova(*groups))
 
     elif request.test_type == "shapiro":
-        test_results = run_shapiro_wilk(df[cols[0]])
+        test_results = await run_in_threadpool(run_shapiro_wilk(df[cols[0]]))
 
     elif request.test_type == "outliers":
-        test_results = detect_outliers_iqr(df[cols[0]])
+        test_results = await run_in_threadpool(detect_outliers_iqr(df[cols[0]]))
 
     # Suggestion if applicable
     if request.test_type in ["ttest", "anova"]:
         groups = [df[col] for col in cols]
-        suggestion = suggest_test(groups)
+        suggestion = await run_in_threadpool(suggest_test(groups))
 
     elif request.test_type == "chi_square":
         if len(cols) != 2:
@@ -258,25 +268,25 @@ async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
                 status_code=400,
                 detail="Chi-Square requires exactly 2 categorical columns",
             )
-        test_results = run_chi_square(df[cols[0]], df[cols[1]])
+        test_results = await run_in_threadpool(run_chi_square(df[cols[0]], df[cols[1]]))
 
     elif request.test_type == "mann_whitney":
         if len(cols) != 2:
             raise HTTPException(
                 status_code=400, detail="Mann-Whitney U requires exactly 2 columns"
             )
-        test_results = run_mannwhitneyu(df[cols[0]], df[cols[1]])
+        test_results = await run_in_threadpool(run_mannwhitneyu(df[cols[0]], df[cols[1]]))
 
     elif request.test_type == "kruskal":
         groups = [df[col] for col in cols]
-        test_results = run_kruskal(*groups)
+        test_results = await run_in_threadpool(run_kruskal(*groups))
 
     elif request.test_type == "wilcoxon":
         if len(cols) != 2:
             raise HTTPException(
                 status_code=400, detail="Wilcoxon requires exactly 2 columns"
             )
-        test_results = run_wilcoxon(df[cols[0]], df[cols[1]])
+        test_results = await run_in_threadpool(run_wilcoxon(df[cols[0]], df[cols[1]]))
 
     return StatTestResponse(
         test_results=convert_numpy_types(test_results),
@@ -288,7 +298,7 @@ async def perform_stat_test(request: StatTestRequest) -> StatTestResponse:
 @router.post("/multivariate", response_model=MultivariateResponse)
 async def perform_multivariate(request: MultivariateRequest) -> MultivariateResponse:
     """Run multivariate analysis (PCA or K-Means)."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
@@ -300,7 +310,7 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
     interpretation = None
 
     if request.analysis_type == "pca":
-        res = run_pca(df, request.features, request.n_components)
+        res = await run_in_threadpool(run_pca(df, request.features, request.n_components))
         if "error" in res:
             raise HTTPException(status_code=400, detail=res["error"])
         
@@ -329,7 +339,7 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
         )
 
     elif request.analysis_type == "kmeans":
-        res = run_kmeans(df, request.features, request.n_clusters)
+        res = await run_in_threadpool(run_kmeans(df, request.features, request.n_clusters))
         if "error" in res:
             raise HTTPException(status_code=400, detail=res["error"])
         
@@ -456,7 +466,7 @@ def _validate_eval_expression(expression: str) -> None:
 @router.post("/transform", response_model=TransformResponse)
 async def transform_variable(request: TransformRequest) -> TransformResponse:
     """Create a new variable using a formula expression."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -513,7 +523,7 @@ async def transform_variable(request: TransformRequest) -> TransformResponse:
 @router.post("/data")
 async def get_column_data(request: GetDataRequest) -> dict[str, list[Any]]:
     """Fetch raw data for specified columns for plotting."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     result = {}
     for col in request.columns:
@@ -575,7 +585,7 @@ async def analyze_dataset_holistically(
 @router.post("/impute", response_model=DataPrepResponse)
 async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
     """Impute missing values in a column."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     if request.column not in df.columns:
         raise HTTPException(
@@ -658,7 +668,7 @@ async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
 @router.post("/encode", response_model=DataPrepResponse)
 async def encode_variable(request: EncodeRequest) -> DataPrepResponse:
     """Encode categorical variable."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
 
     if request.column not in df.columns:
         raise HTTPException(
@@ -725,11 +735,11 @@ async def execute_sql_query(request: SQLQueryRequest) -> SQLQueryResponse:
 
     try:
         # Load file into DuckDB
-        duckdb_service.load_file(str(file_path))
+        await run_in_threadpool(duckdb_service.load_file, str(file_path))
 
         # Execute SQL with timing
         start_time = time.time()
-        result_df = duckdb_service.execute_sql(request.sql)
+        result_df = await run_in_threadpool(duckdb_service.execute_sql, request.sql)
         execution_time = (time.time() - start_time) * 1000
 
         # Convert to response
@@ -763,8 +773,8 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
     sql = ""
     try:
         # Load file and get schema
-        table_name = duckdb_service.load_file(str(file_path))
-        schema_desc = duckdb_service.generate_schema_description(table_name)
+        table_name = await run_in_threadpool(duckdb_service.load_file, str(file_path))
+        schema_desc = await run_in_threadpool(duckdb_service.generate_schema_description, table_name)
 
         # Generate SQL from natural language using LLM
         sql_prompt = f"""你是一位 SQL 專家。根據以下資料表結構，將使用者問題轉換為 DuckDB SQL 查詢。
@@ -795,7 +805,7 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
         sql = sql.strip()
 
         # Execute SQL
-        result_df = duckdb_service.execute_sql(sql)
+        result_df = await run_in_threadpool(duckdb_service.execute_sql, sql)
         data = convert_numpy_types(result_df.head(100).to_dict(orient="records"))
 
         return NLToSQLResponse(
@@ -861,16 +871,16 @@ async def get_sql_schema(file_path: str) -> dict:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {file_path}")
 
     try:
-        table_name = duckdb_service.load_file(str(resolved_path))
-        stats = duckdb_service.get_table_stats(table_name)
-        sample = duckdb_service.get_table_sample(table_name, 5)
+        table_name = await run_in_threadpool(duckdb_service.load_file, str(resolved_path))
+        stats = await run_in_threadpool(duckdb_service.get_table_stats, table_name)
+        sample = await run_in_threadpool(duckdb_service.get_table_sample, table_name, 5)
 
         return {
             "table_name": table_name,
             "stats": stats,
             "sample": convert_numpy_types(sample.to_dict(orient="records")),
-            "schema_description": duckdb_service.generate_schema_description(
-                table_name
+            "schema_description": await run_in_threadpool(
+                duckdb_service.generate_schema_description, table_name
             ),
         }
     except Exception as e:
@@ -880,7 +890,7 @@ async def get_sql_schema(file_path: str) -> dict:
 @router.post("/filter", response_model=FilterResponse)
 async def apply_column_filter(request: FilterRequest) -> FilterResponse:
     """Apply column filters to data and return filtered results."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -899,14 +909,14 @@ async def apply_column_filter(request: FilterRequest) -> FilterResponse:
 @router.post("/batch-report", response_model=BatchReportResponse)
 async def generate_batch_report(request: BatchReportRequest) -> BatchReportResponse:
     """Generate batch reports for each group in a slice column."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     filters = [{"column": f.column, "values": f.values} for f in request.filters]
     analysis_types = request.analysis_types or ["diagnostic", "correlation", "groupby", "outliers"]
 
-    reports = run_batch_report(df, request.slice_column, analysis_types, filters)
+    reports = await run_in_threadpool(run_batch_report(df, request.slice_column, analysis_types, filters))
 
     report_items = [
         ReportItem(
@@ -926,7 +936,7 @@ async def generate_batch_report(request: BatchReportRequest) -> BatchReportRespo
 @router.post("/test/isolation-forest")
 async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
     """Run Isolation Forest anomaly detection."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -935,7 +945,7 @@ async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
 
     contamination = request.params.get("contamination", 0.05) if request.params else 0.05
 
-    result = run_isolation_forest(df, request.features, contamination)
+    result = await run_in_threadpool(run_isolation_forest(df, request.features, contamination))
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -946,7 +956,7 @@ async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
 @router.post("/model/linear")
 async def run_linear_regression_model(request: MultivariateRequest) -> dict:
     """Run Linear Regression for prediction."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -965,7 +975,7 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
         else:
             raise HTTPException(status_code=400, detail="No numeric target column found")
 
-    result = run_linear_regression(df, target, request.features)
+    result = await run_in_threadpool(run_linear_regression(df, target, request.features))
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -976,7 +986,7 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
 @router.post("/model/logistic")
 async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
     """Run Logistic Regression for binary classification."""
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -998,7 +1008,7 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
             detail=f"Target must be binary (2 classes), found {len(unique_vals)} classes"
         )
 
-    result = run_logistic_regression(df, target, request.features)
+    result = await run_in_threadpool(run_logistic_regression(df, target, request.features))
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -1014,7 +1024,7 @@ async def prophet_forecast(request: DiagnosticRequest) -> dict:
     `app.services.statistical_tests` 匯入的實作，若在此覆蓋會讓下方呼叫
     到自己（TypeError），這是先前的真實 bug。
     """
-    df = load_dataframe(request.file_path)
+    df = await load_dataframe_async(request.file_path)
     if df is None:
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
@@ -1035,7 +1045,7 @@ async def prophet_forecast(request: DiagnosticRequest) -> dict:
     value_col = num_cols[0]
     periods = 6
 
-    result = run_prophet_forecast(df, date_col, value_col, periods)
+    result = await run_in_threadpool(run_prophet_forecast(df, date_col, value_col, periods))
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
