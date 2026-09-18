@@ -101,8 +101,6 @@ def _load_sliced(request) -> "pd.DataFrame":
 async def get_diagnostic(request: DiagnosticRequest) -> DiagnosticResponse:
     """Get data quality profiling and summary stats."""
     df = _load_sliced(request)
-    if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     summary_stats = df.describe(include="all").replace({np.nan: None}).to_dict()
 
@@ -882,8 +880,6 @@ async def get_sql_schema(file_path: str) -> dict:
 async def melt_data(request: MeltRequest) -> MeltResponse:
     """Reshape data from wide to long format (pd.melt)."""
     df = _load_sliced(request)
-    if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     missing = [c for c in request.id_vars + request.value_vars if c not in df.columns]
     if missing:
@@ -957,8 +953,6 @@ async def generate_batch_report(request: BatchReportRequest) -> BatchReportRespo
 async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
     """Run Isolation Forest anomaly detection."""
     df = _load_sliced(request)
-    if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
@@ -977,8 +971,6 @@ async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
 async def run_linear_regression_model(request: MultivariateRequest) -> dict:
     """Run Linear Regression for prediction."""
     df = _load_sliced(request)
-    if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
@@ -1007,8 +999,6 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
 async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
     """Run Logistic Regression for binary classification."""
     df = _load_sliced(request)
-    if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
@@ -1040,8 +1030,6 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
 async def run_prophet_forecast(request: DiagnosticRequest) -> dict:
     """Run Prophet time series forecasting."""
     df = _load_sliced(request)
-    if df is None:
-        raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     # Find date and numeric columns
     date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]

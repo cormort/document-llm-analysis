@@ -43,6 +43,7 @@ import {
 
 import { useSettingsStore } from "@/stores/settings-store";
 import { useDataFileStore } from "@/stores/data-file-store";
+import { useSliceStore } from "@/stores/slice-store";
 
 export default function StatisticsPage() {
     const { provider, model_name, local_url, api_key } = useSettingsStore();
@@ -74,8 +75,12 @@ export default function StatisticsPage() {
         fetchFiles();
     }, [fetchFiles]);
 
+    // 離開統計頁時清空切片，避免 withSlice 汙染其他頁面的請求
+    useEffect(() => () => useSliceStore.getState().clearFilters(), []);
+
     const handleSelectDoc = async (fileName: string) => {
         setSelectedDoc(fileName);
+        useSliceStore.getState().clearFilters(); // 須在 getDiagnostic 前清空，否則會帶上舊檔案的切片
         setDiagnostics(null);
         setEdaResults(null);
         setTestResults(null);
