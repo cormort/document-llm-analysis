@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { ErrorToaster } from "@/components/shared/ErrorToaster";
 
 export function Providers({ children }: { children: React.ReactNode }) {
 const [queryClient] = useState(() => new QueryClient());
@@ -10,6 +11,7 @@ const [queryClient] = useState(() => new QueryClient());
 return (
 <QueryClientProvider client={queryClient}>
 <AuthGuard>{children}</AuthGuard>
+<ErrorToaster />
 </QueryClientProvider>
 );
 }

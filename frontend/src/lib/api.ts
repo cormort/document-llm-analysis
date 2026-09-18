@@ -7,6 +7,8 @@
  *  - 各端點的具名函式與型別（與 backend/app/models 的 Pydantic 模型對齊）
  */
 
+import { reportError } from "@/lib/errors";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 const TOKEN_STORAGE_KEY = "auth_token";
@@ -56,6 +58,19 @@ async function extractError(res: Response): Promise<ApiError> {
   return new ApiError(message, res.status, detail);
 }
 
+/**
+ * 把 API 錯誤同時送到全域提示（使用者看得到）與 console（開發者看得到）。
+ *
+ * 401 例外處理：未登入時 `AuthGuard` 已經會導向 /login，不需要再跳出提示。
+ */
+function reportApiError(path: string, error: ApiError): void {
+  if (error.status === 401) return;
+  const label = path.replace(/^\/api\//, "");
+  reportError(`請求失敗（${label}）：${error.message}`, {
+    detail: error.status >= 500 ? "伺服器發生錯誤，請稍後再試或查看後端日誌" : undefined,
+  });
+}
+
 /** 送出 JSON 請求並解析回應。 */
 export async function apiFetch<T>(
   path: string,
@@ -68,7 +83,11 @@ export async function apiFetch<T>(
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
 
-  if (!res.ok) throw await extractError(res);
+  if (!res.ok) {
+    const error = await extractError(res);
+    reportApiError(path, error);
+    throw error;
+  }
   if (res.status === 204) return undefined as T;
 
   const contentType = res.headers.get("content-type") ?? "";
@@ -83,7 +102,11 @@ export async function apiDownload(path: string, json: unknown): Promise<Blob> {
     headers: buildHeaders({ body: "{}" }),
     body: JSON.stringify(json),
   });
-  if (!res.ok) throw await extractError(res);
+  if (!res.ok) {
+    const error = await extractError(res);
+    reportApiError(path, error);
+    throw error;
+  }
   return res.blob();
 }
 
@@ -108,7 +131,11 @@ async function* apiStream(
     signal,
   });
 
-  if (!res.ok) throw await extractError(res);
+  if (!res.ok) {
+    const error = await extractError(res);
+    reportApiError(path, error);
+    throw error;
+  }
   if (!res.body) return;
 
   const reader = res.body.getReader();
@@ -744,7 +771,11 @@ export async function uploadFile(
     body: form,
     signal,
   });
-  if (!res.ok) throw await extractError(res);
+  if (!res.ok) {
+    const error = await extractError(res);
+    reportApiError("/api/upload", error);
+    throw error;
+  }
   return (await res.json()) as UploadResponse;
 }
 

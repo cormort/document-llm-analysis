@@ -18,7 +18,6 @@ import time
 import numpy as np
 import structlog
 from diskcache import FanoutCache
-from sentence_transformers import SentenceTransformer
 
 logger = structlog.get_logger()
 
@@ -64,7 +63,7 @@ class SemanticCache:
             size_limit=500 * 1024 * 1024,
         )
 
-        self._embedder: SentenceTransformer | None = None
+        self._embedder: object | None = None  # SentenceTransformer（延遲載入）
         self._embedder_name = "BAAI/bge-m3"
         self._initialized = False
 
@@ -92,6 +91,8 @@ class SemanticCache:
                     device = "cuda"
             except ImportError:
                 pass
+
+            from sentence_transformers import SentenceTransformer
 
             self._embedder = SentenceTransformer(self._embedder_name, device=device)
             self._initialized = True

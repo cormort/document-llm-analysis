@@ -90,7 +90,7 @@ class RAGIndexerMixin:
                     )
 
             try:
-                self.client.delete_collection(collection_name)
+                await self._run_sync(self.client.delete_collection, collection_name)
             except Exception:
                 pass
 
@@ -98,7 +98,7 @@ class RAGIndexerMixin:
 
             if chunking_strategy == "semantic" and self.semantic_chunker:
                 logger.info("Using semantic chunking")
-                chunks = self.semantic_chunker.chunk(content)
+                chunks = await self._run_sync(self.semantic_chunker.chunk, content)
             else:
                 logger.info("Using fixed-size chunking")
                 chunks = self._chunk_text(content)
@@ -107,8 +107,15 @@ class RAGIndexerMixin:
                 return {"success": False, "error": "Document has no content"}
 
             logger.info("Generating embeddings", count=len(chunks))
-            embeddings = self.embedder.encode(
-                chunks, batch_size=32, show_progress_bar=False, convert_to_numpy=True
+            # embedding 推論是阻塞式 CPU/GPU 工作，放到 thread pool 執行
+            embeddings = (
+                await self._run_sync(
+                    self.embedder.encode,
+                    chunks,
+                    batch_size=32,
+                    show_progress_bar=False,
+                    convert_to_numpy=True,
+                )
             ).tolist()
 
             metadatas = [
@@ -121,7 +128,8 @@ class RAGIndexerMixin:
                 for i, chunk in enumerate(chunks)
             ]
 
-            collection.add(
+            await self._run_sync(
+                collection.add,
                 ids=[f"chunk_{i}" for i in range(len(chunks))],
                 embeddings=embeddings,
                 documents=chunks,
@@ -164,7 +172,7 @@ class RAGIndexerMixin:
                     if extraction_data and isinstance(extraction_data, dict):
                         graph_rag_service.add_triplets(extraction_data, cid)
 
-                graph_rag_service.save_graph()
+                await self._run_sync(graph_rag_service.save_graph)
 
             return {
                 "success": True,
@@ -213,17 +221,20 @@ class RAGIndexerMixin:
         if not self._lazy_init():
             return []
         try:
-            collections = self.client.list_collections()
-            return [
-                {
-                    "collection_name": col.name,
-                    "file_name": (col.metadata or {}).get("file_name", "Unknown"),
-                    "file_type": (col.metadata or {}).get("file_type", "Unknown"),
-                    "indexed_at": (col.metadata or {}).get("indexed_at", "Unknown"),
-                    "count": col.count(),
-                }
-                for col in collections
-            ]
+            collections = await self._run_sync(self.client.list_collections)
+            documents = []
+            for col in collections:
+                metadata = col.metadata or {}
+                documents.append(
+                    {
+                        "collection_name": col.name,
+                        "file_name": metadata.get("file_name", "Unknown"),
+                        "file_type": metadata.get("file_type", "Unknown"),
+                        "indexed_at": metadata.get("indexed_at", "Unknown"),
+                        "count": await self._run_sync(col.count),
+                    }
+                )
+            return documents
         except Exception as e:
             logger.error("List collections failed", error=str(e))
             return []
@@ -269,7 +280,9 @@ class RAGIndexerMixin:
                     progress_callback(i + 1, total, meta.get("file_name", col_name))
 
                 try:
-                    all_docs = col.get(include=["documents", "metadatas"])
+                    all_docs = await self._run_sync(
+                        col.get, include=["documents", "metadatas"]
+                    )
                     if not all_docs or not all_docs["documents"]:
                         results.append(
                             {"collection": col_name, "status": "skipped", "reason": "empty"}
@@ -281,18 +294,24 @@ class RAGIndexerMixin:
                     ids = all_docs["ids"]
 
                     logger.info(f"Re-embedding {len(documents)} chunks for {col_name}")
-                    new_embeddings = self.embedder.encode(
-                        documents,
-                        batch_size=32,
-                        show_progress_bar=False,
-                        convert_to_numpy=True,
+                    new_embeddings = (
+                        await self._run_sync(
+                            self.embedder.encode,
+                            documents,
+                            batch_size=32,
+                            show_progress_bar=False,
+                            convert_to_numpy=True,
+                        )
                     ).tolist()
 
-                    self.client.delete_collection(col_name)
-                    new_col = self.client.get_or_create_collection(
-                        name=col_name, metadata=meta
+                    await self._run_sync(self.client.delete_collection, col_name)
+                    new_col = await self._run_sync(
+                        self.client.get_or_create_collection,
+                        name=col_name,
+                        metadata=meta,
                     )
-                    new_col.add(
+                    await self._run_sync(
+                        new_col.add,
                         ids=ids,
                         embeddings=new_embeddings,
                         documents=documents,
@@ -348,7 +367,9 @@ class RAGIndexerMixin:
         from app.services.llm_service import llm_service
 
         try:
-            collection = self.client.get_collection(collection_name)
+            collection = await self._run_sync(
+                self.client.get_collection, collection_name
+            )
             meta = collection.metadata or {}
 
             if meta.get("cached_summary"):

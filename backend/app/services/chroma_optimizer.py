@@ -13,7 +13,6 @@ Features:
 import os
 from datetime import datetime, timedelta
 
-import chromadb
 import structlog
 from chromadb.config import Settings as ChromaSettings
 
@@ -35,7 +34,7 @@ class ChromaDBOptimizer:
             persist_directory: ChromaDB 資料目錄
         """
         self.persist_directory = persist_directory
-        self._client: chromadb.Client | None = None
+        self._client: object | None = None  # chromadb.Client（延遲載入）
         self._initialized = False
 
     def _lazy_init(self) -> bool:
@@ -45,6 +44,8 @@ class ChromaDBOptimizer:
 
         try:
             os.makedirs(self.persist_directory, exist_ok=True)
+
+            import chromadb
 
             self._client = chromadb.PersistentClient(
                 path=self.persist_directory,
