@@ -46,6 +46,7 @@ class KnowledgeConsolidator:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """
         Consolidate internal and external knowledge.
@@ -57,6 +58,7 @@ class KnowledgeConsolidator:
             provider: LLM provider for consolidation
             model_name: Model name
             local_url: Local LLM URL if applicable
+            api_key: API key for the LLM provider
 
         Returns:
             {
@@ -92,6 +94,7 @@ class KnowledgeConsolidator:
             provider=provider,
             model_name=model_name,
             local_url=local_url,
+            api_key=api_key,
         )
 
         # Compute reliability scores for each fact category
@@ -193,6 +196,7 @@ class KnowledgeConsolidator:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """Use LLM to perform detailed knowledge consolidation."""
         internal_facts_text = (
@@ -240,6 +244,7 @@ class KnowledgeConsolidator:
                 provider=provider,
                 model_name=model_name,
                 local_url=local_url,
+                api_key=api_key,
             )
 
             # Parse JSON from response

@@ -76,6 +76,7 @@ class AstuteRAGService:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """
         Extract relevant knowledge from LLM's internal knowledge base.
@@ -88,6 +89,7 @@ class AstuteRAGService:
             provider: LLM provider
             model_name: Model name
             local_url: Local LLM URL
+            api_key: API key for the LLM provider
 
         Returns:
             {
@@ -126,6 +128,7 @@ class AstuteRAGService:
                 provider=provider,
                 model_name=model_name,
                 local_url=local_url,
+                api_key=api_key,
             )
 
             # Parse JSON
@@ -229,6 +232,7 @@ class AstuteRAGService:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
     ) -> dict[str, Any]:
         """
         Generate final answer based on consolidated, reliability-assessed knowledge.
@@ -240,6 +244,7 @@ class AstuteRAGService:
             provider: LLM provider
             model_name: Model name
             local_url: Local LLM URL
+            api_key: API key for the LLM provider
 
         Returns:
             {
@@ -306,6 +311,7 @@ class AstuteRAGService:
                 provider=provider,
                 model_name=model_name,
                 local_url=local_url,
+                api_key=api_key,
             )
 
             # Calculate overall confidence
@@ -371,6 +377,7 @@ class AstuteRAGService:
         provider: str | None = None,
         model_name: str | None = None,
         local_url: str | None = None,
+        api_key: str | None = None,
         force_retrieval: bool = False,
     ) -> dict[str, Any]:
         """
@@ -393,6 +400,7 @@ class AstuteRAGService:
             provider: LLM provider
             model_name: Model name
             local_url: Local LLM URL
+            api_key: API key for the LLM provider
             force_retrieval: Always perform retrieval
 
         Returns:
@@ -406,6 +414,7 @@ class AstuteRAGService:
             provider=provider,
             model_name=model_name,
             local_url=local_url,
+            api_key=api_key,
         )
 
         # Step 2: Decide on retrieval
@@ -449,6 +458,7 @@ class AstuteRAGService:
                 provider=provider,
                 model_name=model_name,
                 local_url=local_url,
+                api_key=api_key,
             )
         else:
             # No retrieval - use internal knowledge only
@@ -478,6 +488,7 @@ class AstuteRAGService:
             provider=provider,
             model_name=model_name,
             local_url=local_url,
+            api_key=api_key,
         )
 
         # Add metadata

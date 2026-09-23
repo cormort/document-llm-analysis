@@ -342,6 +342,7 @@ async def astute_query(request: AstuteRAGQueryRequest) -> AstuteRAGQueryResponse
             provider=request.config.provider,
             model_name=request.config.model_name,
             local_url=request.config.local_url,
+            api_key=api_key,
             force_retrieval=request.force_retrieval,
         )
 
@@ -485,6 +486,7 @@ async def verify_answer(request: VerifyAnswerRequest) -> VerifyAnswerResponse:
             provider=request.config.provider,
             model_name=request.config.model_name,
             local_url=request.config.local_url,
+            api_key=api_key,
         )
 
         # Parse result
