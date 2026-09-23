@@ -83,7 +83,7 @@ class AnalysisPrompts:
 **輸出格式：**
 - 使用 Markdown 格式
 - 數據和論點需附來源標註
-- 在報告結尾可加入「參考來源」章節彙整所有引用"""
+- 在報告結尾可加入「參考來源」章節彙整所有引用"""  # noqa: E501
 
         if (
             financial_skepticism
@@ -101,7 +101,7 @@ class AnalysisPrompts:
 
 ⚠️ **必須標註資料出處**：所有引用的數據必須標註 `[來源: {file_name}, 第X頁]`
 
-語氣必須冷靜、專業、具穿透力且極端尖銳。你的回答應讓決策者感受到第三方專業評估的壓力。"""
+語氣必須冷靜、專業、具穿透力且極端尖銳。你的回答應讓決策者感受到第三方專業評估的壓力。"""  # noqa: E501
 
         user_prompt = f"""【使用者指令】：{user_instruction}
 
@@ -150,7 +150,8 @@ class AnalysisPrompts:
             truncated = True
             content = (
                 content[:max_chars]
-                + f"\n\n...(內容已截斷至 {max_chars} 字元以符合模型限制 {context_window})..."
+                + f"\n\n...(內容已截斷至 {max_chars} 字元"
+                f"以符合模型限制 {context_window})..."
             )
 
         file_name = os.path.basename(file_path) if file_path else "text_input"

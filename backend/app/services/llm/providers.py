@@ -6,14 +6,15 @@ Unified interface for Gemini, OpenAI, and Local LLM providers.
 import asyncio
 import json
 import time
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
-from typing import AsyncGenerator
 
 import httpx
 import requests
 import structlog
 from google import genai
 from google.genai import types
+
 from app.core.metrics import LLM_TOKEN_USAGE_TOTAL
 
 logger = structlog.get_logger()
@@ -90,7 +91,13 @@ class LLMProviders:
 
         # For OpenAI-compatible providers
         async for chunk in self._stream_openai_compatible(
-            provider, model_name, local_url, api_key_input, system_prompt, user_prompt, **kwargs
+            provider,
+            model_name,
+            local_url,
+            api_key_input,
+            system_prompt,
+            user_prompt,
+            **kwargs,
         ):
             yield chunk
 
@@ -115,7 +122,11 @@ class LLMProviders:
             # Per-request client: genai.configure() is process-global and races
             # when concurrent requests use different keys.
             client = genai.Client(api_key=api_key_input)
-            logger.info("Gemini Generating...", model=clean_model_name, input_len=len(user_prompt))
+            logger.info(
+                "Gemini Generating...",
+                model=clean_model_name,
+                input_len=len(user_prompt),
+            )
             response = await client.aio.models.generate_content(
                 model=clean_model_name,
                 contents=user_prompt,
@@ -296,7 +307,7 @@ class LLMProviders:
                         provider=provider, model=model_name
                     ).inc(tokens)
                 content = data["choices"][0]["message"]["content"]
-                # If content is a list of parts, filter out thinking and concatenate text.
+                # If content is a list of parts, drop thinking and concatenate text.
                 if isinstance(content, list):
                     text_parts = []
                     for part in content:
@@ -455,7 +466,8 @@ class LLMProviders:
                             break
                         try:
                             data = json.loads(data_str)
-                            content = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            delta = data.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
                             if content:
                                 yield content
                         except Exception:

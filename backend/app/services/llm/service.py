@@ -3,8 +3,9 @@ LLM Service - Main Integration Module
 Consolidated AI service supporting multiple providers and advanced analysis tasks.
 """
 
+from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import structlog
 
@@ -252,10 +253,8 @@ class LLMService:
         max_chars = int(available_tokens * 1.5)
 
         file_name = "text_input"
-        truncated = False
 
         if len(text_content) > max_chars:
-            truncated = True
             text_content = (
                 text_content[:max_chars]
                 + f"\n\n...(內容已截斷至 {max_chars} 字元以符合模型限制)..."
@@ -295,7 +294,10 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        system_prompt = f"你是一位專業翻譯員。請將以下文字翻譯成{target_language}，保持原文的語氣和格式。"
+        system_prompt = (
+            f"你是一位專業翻譯員。請將以下文字翻譯成{target_language}，"
+            "保持原文的語氣和格式。"
+        )
         user_prompt = text
 
         return await self._call_provider(
@@ -353,7 +355,10 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        system_prompt = f"你是一位資訊萃取專家。請從以下文字中萃取{extraction_type}，以結構化格式輸出。"
+        system_prompt = (
+            f"你是一位資訊萃取專家。請從以下文字中萃取{extraction_type}，"
+            "以結構化格式輸出。"
+        )
         user_prompt = text
 
         return await self._call_provider(
@@ -394,7 +399,7 @@ class LLMService:
         {{"subject": "主體", "object": "受體", "relation": "關係"}}
     ]
 }}
-如果沒有找到，請回傳空的陣列。不要輸出任何其他說明文字。"""
+如果沒有找到，請回傳空的陣列。不要輸出任何其他說明文字。"""  # noqa: E501
         user_prompt = text
 
         response = await self._call_provider(
@@ -450,7 +455,10 @@ class LLMService:
             model_name = config["model_name"]
             local_url = config.get("local_url")
 
-        system_prompt = f"你是一位專業報告撰寫員。請根據以下內容生成一份{report_type}，使用 Markdown 格式。"
+        system_prompt = (
+            f"你是一位專業報告撰寫員。請根據以下內容生成一份{report_type}，"
+            "使用 Markdown 格式。"
+        )
         user_prompt = content
 
         return await self._call_provider(
@@ -523,7 +531,7 @@ class LLMService:
 2. **格式優雅**：請務必使用 Markdown 格式，適當使用 `###` 標題、粗體與列表來增加可讀性，嚴禁輸出一整塊密集的文字。
 3. **忠於真實**：只使用上下文中的資訊回答。如果上下文中沒有相關資訊，請明確告知。
 4. **標註來源**：引用具體數據或論點時，請簡要標註來源，如 `[資料來源1]`。
-5. **禁止思考內容**：不要在回覆中加入 `<thought>` 標記、思考過程或任何非最終答案的訊息。"""
+5. **禁止思考內容**：不要在回覆中加入 `<thought>` 標記、思考過程或任何非最終答案的訊息。"""  # noqa: E501
 
         user_prompt = f"""請精簡、專業地摘要或回答以下問題：
 
@@ -570,7 +578,7 @@ class LLMService:
 2. **格式優雅**：請務必使用 Markdown 格式，適當使用 `###` 標題、粗體與列表來增加可讀性，嚴禁輸出一整塊密集的文字。
 3. **忠於真實**：只使用上下文中的資訊回答。如果上下文中沒有相關資訊，請明確告知。
 4. **標註來源**：引用具體數據或論點時，請簡要標註來源。
-5. **禁止思考內容**：不要在回覆中加入思考過程或任何非最終答案的訊息。"""
+5. **禁止思考內容**：不要在回覆中加入思考過程或任何非最終答案的訊息。"""  # noqa: E501
 
         user_prompt = f"""請精簡、專業地摘要或回答以下問題：
 

@@ -1,5 +1,5 @@
 import re
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 
 class StreamFilter:
@@ -37,7 +37,9 @@ class StreamFilter:
     ]
 
     # Gemma 4 / DeepSeek / QwQ use <think>, others use <thinking> etc.
-    THOUGHT_TAGS = ["think", "thought", "thinking", "reasoning", "internal", "scratchpad"]
+    THOUGHT_TAGS = [
+        "think", "thought", "thinking", "reasoning", "internal", "scratchpad"
+    ]
 
     def __init__(self):
         self.buffer = ""
@@ -67,7 +69,6 @@ class StreamFilter:
     def _find_potential_tag_close(self, text: str, tag: str) -> bool:
         """Check if buffer might be starting a close tag (partial match)."""
         text_lower = text.lower()
-        close_tag = f"</{tag}>"
         if f"</{tag}" in text_lower:
             return True
         if any(text_lower.endswith(f"</{tag[:i]}") for i in range(1, len(tag) + 1)):
@@ -86,7 +87,8 @@ class StreamFilter:
         filtered_lines = []
         for i, line in enumerate(lines):
             stripped = line.strip()
-            # The first piece continues the previous chunk's line unless that ended with \n.
+            # The first piece continues the previous chunk's line,
+            # unless that chunk ended with \n.
             is_prefix = (i > 0 or self.at_line_start) and any(
                 re.match(p, stripped, re.IGNORECASE) for p in self.THINKING_PREFIXES
             )
