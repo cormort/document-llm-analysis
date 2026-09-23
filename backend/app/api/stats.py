@@ -13,7 +13,6 @@ from sklearn.preprocessing import LabelEncoder
 from app.models.stats import (
     BatchReportRequest,
     BatchReportResponse,
-    ColumnFilter,
     DataPrepResponse,
     DataQualityItem,
     DatasetAnalysisRequest,
@@ -33,11 +32,11 @@ from app.models.stats import (
     ImputeRequest,
     InterpretStatsRequest,
     InterpretStatsResponse,
+    LLMConfig,
     MeltRequest,
     MeltResponse,
     MultivariateRequest,
     MultivariateResponse,
-    LLMConfig,
     NLToSQLRequest,
     NLToSQLResponse,
     ReportItem,
@@ -65,16 +64,16 @@ from app.services.statistical_tests import (
     run_chi_square,
     run_correlation_matrix,
     run_isolation_forest,
+    run_kmeans,
     run_kruskal,
     run_linear_regression,
     run_logistic_regression,
     run_mannwhitneyu,
+    run_pca,
     run_prophet_forecast,
     run_shapiro_wilk,
     run_ttest,
     run_wilcoxon,
-    run_pca,
-    run_kmeans,
     suggest_test,
 )
 from app.utils.file_resolver import (
@@ -120,7 +119,7 @@ async def get_diagnostic(request: DiagnosticRequest) -> DiagnosticResponse:
 
     # Interpretation if requested
     interpretation = None
-    # We could call AI here if needed, but usually it's a separate step triggered by user
+    # AI interpretation is a separate, user-triggered step
 
     return DiagnosticResponse(
         summary_stats=summary_stats,
@@ -223,9 +222,11 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
                     api_key=request.config.api_key,
                 )
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=f"Column not found: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Column not found: {str(e)}"
+            ) from e
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     elif request.analysis_type == "pivot":
         index_cols = request.params.get("index") or []
@@ -234,7 +235,9 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
         agg_func = request.params.get("agg", "mean")
 
         if not index_cols or not value_cols:
-            raise HTTPException(status_code=400, detail="請至少選擇列 (Index) 與值 (Values)")
+            raise HTTPException(
+                status_code=400, detail="請至少選擇列 (Index) 與值 (Values)"
+            )
 
         try:
             pv = pd.pivot_table(
@@ -254,7 +257,7 @@ async def perform_eda(request: EDARequest) -> EDAResponse:
                 pv.replace({np.nan: None}).to_dict(orient="records")
             )
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"透視表錯誤: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"透視表錯誤: {str(e)}") from e
 
     return EDAResponse(result_data=result_data, interpretation=interpretation)
 
@@ -394,7 +397,10 @@ async def perform_multivariate(request: MultivariateRequest) -> MultivariateResp
             api_key=api_key,
         )
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported multivariate analysis type: {request.analysis_type}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported multivariate analysis type: {request.analysis_type}",
+        )
 
     return MultivariateResponse(
         analysis_type=request.analysis_type,
@@ -444,54 +450,16 @@ async def transform_variable(request: TransformRequest) -> TransformResponse:
     df = _load_sliced(request)
 
     try:
-        # Security: pd.eval is safer than eval() but still powerful.
-        # Ideally we'd restrict the local scope.
-        # Using engine='numexpr' is generally safer and faster for numerical ops.
-
-        # Safe-guard: limit expression length and chars
+        # df.eval evaluates in the DataFrame's column namespace (e.g. "colA + colB").
         if len(request.expression) > 200:
             raise HTTPException(status_code=400, detail="Expression too long")
 
-        # Evaluate
-        # Note: df.eval operates within the DataFrame columns namespace
-        # e.g. "colA + colB"
-
-        # Check if column already exists
-        if request.new_column in df.columns:
-            # Just overwrite? Or warn? Overwrite for now.
-            pass
-
-        # Perform calculation
-        # We use assignment syntax internally: "new_col = expression"
-        # but df.eval can just return the series
-
         new_series = df.eval(request.expression)
-
-        # Add to dataframe temporary to extract values/preview
-        # Since API is stateless regarding DF modifications unless we save back.
-        # User requirement implies visualization of synthetic variables.
-        # We will return the values so frontend can visualize it.
-        # We generally do NOT save modified CSV back to disk automatically to avoid data corruption,
-        # unless explicitly requested. The user said "can synthesize variables", implying for plotting.
-
-        # If we want to persist it, we'd overwrite the file or save a new version.
-        # For this request, let's return the data for the frontend to manage (or visualize).
-        # We return the new column name and values.
-
-        # Validation: New series length must match
         if len(new_series) != len(df):
             raise HTTPException(status_code=400, detail="Result length mismatch")
 
-        # Prepare response
-        # Preview: new column + first few rows
-        # We'll create a little preview dict
-
-        # Convert series to list, handling NaN and types
+        # ponytail: not persisted (stateless API); the frontend gets the values to plot.
         values = convert_numpy_types(new_series.values)
-
-        # Create a preview of what happened
-        # Get head of used columns + new column ?? difficult to know used columns easily without parsing
-        # Just return head of new column
 
         preview = []
         head = new_series.head(5)
@@ -506,7 +474,9 @@ async def transform_variable(request: TransformRequest) -> TransformResponse:
         import logging
 
         logging.exception("Transformation failed")
-        raise HTTPException(status_code=400, detail=f"Transformation failed: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Transformation failed: {str(e)}"
+        ) from e
 
 
 @router.post("/data")
@@ -611,34 +581,8 @@ async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
                     request.fill_value = "Missing"
             df[request.column] = df[request.column].fillna(request.fill_value)
 
-        # Normally we would save the file back, but for now we operate in-memory/session or return preview.
-        # Ideally, we should create a 'cleaned' version of the file or handle session state.
-        # Given this is a demo/analysis tool, returning preview is key.
-        # But for 'Data Prep' to be useful for subsequent steps ('Modeling'), updates MUST persist.
-        # Let's save to a temporary 'processed' file or overwrite (with caution).
-        # Decision: Save as [filename]_processed.csv and return that path?
-        # Or Just return success and let frontend know.
-        # For simplicity in this architecture, let's assume we modify the DF and maybe save it back to a cache?
-        # Since get_df reloads every time, we MUST save to disk if we want persistence.
-
-        # NOTE: For this implementation, we will NOT overwrite the original file to be safe.
-        # We will not actually persist changes in this stateless API design unless we have a session.
-        # However, to make the flow work, we need to persist.
-        # Let's implement a 'session_cache' later. For now, we will return the values and let frontend handle it?
-        # No, frontend can't handle full DF.
-        # Let's simple return the preview and assume this is a 'dry run' OR
-        # if this is a real tool, we should probably have a 'save_version' flag.
-
-        # Hack for "Pro Max" demo: We will just return the imputed values preview so user sees it works.
-        # Real persistence requires a session manager refactor.
-
-        # ... Wait, the prompt implies "Advanced Data Prep".
-        # I'll modify the DF in memory and return values, but also print a warning that persistence isn't fully implemented
-        # without a session ID.
-        # Actually, let's look at `transform_variable` implementation. It creates a new variable and returns values.
-        # But `impute` modifies in place.
-        # Let's return the modified column values.
-
+        # ponytail: not persisted (stateless API), returns a preview only;
+        # persisting needs a session or a versioned copy of the file.
         preview = []
         head = df[request.column].head(5)
         for idx, val in head.items():
@@ -651,7 +595,7 @@ async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
             preview=preview,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/encode", response_model=DataPrepResponse)
@@ -698,7 +642,7 @@ async def encode_variable(request: EncodeRequest) -> DataPrepResponse:
             preview=preview,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ============ DuckDB SQL Query Endpoints ============
@@ -773,7 +717,7 @@ async def natural_language_to_sql(request: NLToSQLRequest) -> NLToSQLResponse:
 使用者問題: {request.question}
 
 請只輸出 SQL 查詢語句，不要有其他說明或 markdown 格式。使用表名 '{table_name}'。
-"""
+"""  # noqa: E501
 
         api_key = request.config.api_key
 
@@ -873,7 +817,7 @@ async def get_sql_schema(file_path: str) -> dict:
             ),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/melt", response_model=MeltResponse)
@@ -894,9 +838,9 @@ async def melt_data(request: MeltRequest) -> MeltResponse:
             value_name="數值",
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Melt 錯誤: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Melt 錯誤: {str(e)}") from e
 
-    # ponytail: cap at 5000 rows for the response; full export can stream later if needed
+    # ponytail: cap response at 5000 rows; stream a full export later if needed
     data = convert_numpy_types(
         melted.head(5000).replace({np.nan: None}).to_dict(orient="records")
     )
@@ -930,7 +874,9 @@ async def generate_batch_report(request: BatchReportRequest) -> BatchReportRespo
         raise HTTPException(status_code=404, detail=f"檔案未找到: {request.file_path}")
 
     filters = [{"column": f.column, "values": f.values} for f in request.filters]
-    analysis_types = request.analysis_types or ["diagnostic", "correlation", "groupby", "outliers"]
+    analysis_types = request.analysis_types or [
+        "diagnostic", "correlation", "groupby", "outliers"
+    ]
 
     reports = run_batch_report(df, request.slice_column, analysis_types, filters)
 
@@ -957,7 +903,9 @@ async def run_isolation_forest_test(request: MultivariateRequest) -> dict:
     if not request.features:
         raise HTTPException(status_code=400, detail="No features provided")
 
-    contamination = request.params.get("contamination", 0.05) if request.params else 0.05
+    contamination = (
+        request.params.get("contamination", 0.05) if request.params else 0.05
+    )
 
     result = run_isolation_forest(df, request.features, contamination)
 
@@ -977,10 +925,14 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
 
     target = request.params.get("target") if request.params else None
     if not target:
-        raise HTTPException(status_code=400, detail="Target column not specified in params")
+        raise HTTPException(
+            status_code=400, detail="Target column not specified in params"
+        )
 
     if target not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Target column '{target}' not found")
+        raise HTTPException(
+            status_code=400, detail=f"Target column '{target}' not found"
+        )
 
     result = run_linear_regression(df, target, request.features)
 
@@ -1000,17 +952,24 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
 
     target = request.params.get("target") if request.params else None
     if not target:
-        raise HTTPException(status_code=400, detail="Target column not specified in params")
+        raise HTTPException(
+            status_code=400, detail="Target column not specified in params"
+        )
 
     if target not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Target column '{target}' not found")
+        raise HTTPException(
+            status_code=400, detail=f"Target column '{target}' not found"
+        )
 
     # Check if binary
     unique_vals = df[target].dropna().unique()
     if len(unique_vals) != 2:
         raise HTTPException(
             status_code=400,
-            detail=f"Target must be binary (2 classes), found {len(unique_vals)} classes"
+            detail=(
+                "Target must be binary (2 classes), "
+                f"found {len(unique_vals)} classes"
+            ),
         )
 
     result = run_logistic_regression(df, target, request.features)
@@ -1030,7 +989,8 @@ async def prophet_forecast(request: DiagnosticRequest) -> dict:
     date_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]
     if not date_cols:
         # Try to find date-like columns
-        date_cols = [c for c in df.columns if any(kw in c.lower() for kw in ["date", "日期", "年", "time", "月"])]
+        keywords = ["date", "日期", "年", "time", "月"]
+        date_cols = [c for c in df.columns if any(kw in c.lower() for kw in keywords)]
 
     if not date_cols:
         raise HTTPException(status_code=400, detail="No date column found")
