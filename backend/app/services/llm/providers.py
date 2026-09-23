@@ -9,10 +9,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator
 
-import google.generativeai as genai
 import httpx
 import requests
 import structlog
+from google import genai
+from google.genai import types
 from app.core.metrics import LLM_TOKEN_USAGE_TOTAL
 
 logger = structlog.get_logger()
@@ -107,26 +108,26 @@ class LLMProviders:
             return "⚠️ 未設定 Google API Key"
 
         try:
-            genai.configure(api_key=api_key_input)
-
             clean_model_name = model_name
             if clean_model_name and clean_model_name.startswith("models/"):
                 clean_model_name = clean_model_name.replace("models/", "")
 
-            logger.info("Gemini Model Init", model=clean_model_name)
-            model = genai.GenerativeModel(
-                clean_model_name, system_instruction=system_prompt
+            # Per-request client: genai.configure() is process-global and races
+            # when concurrent requests use different keys.
+            client = genai.Client(api_key=api_key_input)
+            logger.info("Gemini Generating...", model=clean_model_name, input_len=len(user_prompt))
+            response = await client.aio.models.generate_content(
+                model=clean_model_name,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(system_instruction=system_prompt),
             )
-
-            logger.info("Gemini Generating...", input_len=len(user_prompt))
-            response = await model.generate_content_async(user_prompt)
             logger.info("Gemini Response Recv")
 
             if not response.candidates:
                 return "Gemini Error: No candidates returned."
 
             if hasattr(response, "usage_metadata") and response.usage_metadata:
-                tokens = getattr(response.usage_metadata, "total_token_count", 0)
+                tokens = response.usage_metadata.total_token_count or 0
                 if tokens > 0:
                     LLM_TOKEN_USAGE_TOTAL.labels(
                         provider="Gemini", model=clean_model_name
@@ -136,7 +137,7 @@ class LLMProviders:
             if candidate.content and candidate.content.parts:
                 return response.text
 
-            if candidate.finish_reason == 1:
+            if candidate.finish_reason == types.FinishReason.STOP:
                 return ""
 
             return f"Gemini Error: Finish Reason {candidate.finish_reason}"
@@ -382,15 +383,16 @@ class LLMProviders:
             return
 
         try:
-            genai.configure(api_key=api_key_input)
             clean_model_name = model_name
             if clean_model_name and clean_model_name.startswith("models/"):
                 clean_model_name = clean_model_name.replace("models/", "")
 
-            model = genai.GenerativeModel(
-                clean_model_name, system_instruction=system_prompt
+            client = genai.Client(api_key=api_key_input)
+            response = await client.aio.models.generate_content_stream(
+                model=clean_model_name,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(system_instruction=system_prompt),
             )
-            response = await model.generate_content_async(user_prompt, stream=True)
             async for chunk in response:
                 if chunk.text:
                     yield chunk.text
@@ -470,12 +472,13 @@ class LLMProviders:
             return ["⚠️ 未設定 API Key"]
 
         try:
-            genai.configure(api_key=api_key_input)
-            models = genai.list_models(request_options={"timeout": 10})
+            client = genai.Client(
+                api_key=api_key_input, http_options=types.HttpOptions(timeout=10_000)
+            )
             return [
                 m.name.replace("models/", "")
-                for m in models
-                if "generateContent" in m.supported_generation_methods
+                for m in client.models.list()
+                if "generateContent" in (m.supported_actions or [])
             ]
         except Exception as e:
             logger.error("Gemini List Models Error", error=str(e))

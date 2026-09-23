@@ -9,7 +9,6 @@ import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator
 
-import google.generativeai as genai
 import structlog
 
 from app.core.config import settings
@@ -42,8 +41,6 @@ class LLMService:
 
     def __init__(self) -> None:
         self.api_key: str | None = settings.GOOGLE_API_KEY
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
         self._executor = ThreadPoolExecutor(max_workers=5)
         self._providers = LLMProviders(self._executor, self.api_key)
 
