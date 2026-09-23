@@ -441,7 +441,7 @@ async def interpret_stats(request: InterpretStatsRequest) -> InterpretStatsRespo
 @router.post("/transform", response_model=TransformResponse)
 async def transform_variable(request: TransformRequest) -> TransformResponse:
     """Create a new variable using a formula expression."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     try:
         # Security: pd.eval is safer than eval() but still powerful.
@@ -512,7 +512,7 @@ async def transform_variable(request: TransformRequest) -> TransformResponse:
 @router.post("/data")
 async def get_column_data(request: GetDataRequest) -> dict[str, list[Any]]:
     """Fetch raw data for specified columns for plotting."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     result = {}
     for col in request.columns:
@@ -574,7 +574,7 @@ async def analyze_dataset_holistically(
 @router.post("/impute", response_model=DataPrepResponse)
 async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
     """Impute missing values in a column."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     if request.column not in df.columns:
         raise HTTPException(
@@ -657,7 +657,7 @@ async def impute_missing(request: ImputeRequest) -> DataPrepResponse:
 @router.post("/encode", response_model=DataPrepResponse)
 async def encode_variable(request: EncodeRequest) -> DataPrepResponse:
     """Encode categorical variable."""
-    df = load_dataframe(request.file_path)
+    df = _load_sliced(request)
 
     if request.column not in df.columns:
         raise HTTPException(
@@ -979,13 +979,8 @@ async def run_linear_regression_model(request: MultivariateRequest) -> dict:
     if not target:
         raise HTTPException(status_code=400, detail="Target column not specified in params")
 
-    # Use first numeric column as target if not specified
     if target not in df.columns:
-        num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if num_cols:
-            target = num_cols[0]
-        else:
-            raise HTTPException(status_code=400, detail="No numeric target column found")
+        raise HTTPException(status_code=400, detail=f"Target column '{target}' not found")
 
     result = run_linear_regression(df, target, request.features)
 
@@ -1027,7 +1022,7 @@ async def run_logistic_regression_model(request: MultivariateRequest) -> dict:
 
 
 @router.post("/forecast/prophet")
-async def run_prophet_forecast(request: DiagnosticRequest) -> dict:
+async def prophet_forecast(request: DiagnosticRequest) -> dict:
     """Run Prophet time series forecasting."""
     df = _load_sliced(request)
 

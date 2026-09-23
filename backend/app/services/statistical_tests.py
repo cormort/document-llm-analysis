@@ -363,7 +363,7 @@ def run_kmeans(df: pd.DataFrame, features: list[str], n_clusters: int = 3) -> di
     }
 
 
-def apply_filters(df: pd.DataFrame, filters: list[dict]) -> pd.DataFrame:
+def apply_filters(df: pd.DataFrame, filters: list[dict]) -> tuple[pd.DataFrame, list[str]]:
     """
     Apply multiple column filters to a DataFrame.
 
@@ -587,7 +587,7 @@ def run_prophet_forecast(
     )
     model.fit(prophet_df)
 
-    future = model.make_future_dataframe(periods=periods, freq="M")
+    future = model.make_future_dataframe(periods=periods, freq="ME")
     forecast = model.predict(future)
 
     historical = prophet_df[["ds", "y"]].to_dict(orient="records")
@@ -627,10 +627,7 @@ def run_batch_report(
     if slice_column not in df.columns:
         return [{"error": f"Column '{slice_column}' not found"}]
 
-    groups = df[slice_column].unique()
-
-    for group_val in groups:
-        group_df = df[df[slice_column] == group_val]
+    for group_val, group_df in df.groupby(slice_column, dropna=False, sort=False):
         report = {
             "group_value": str(group_val),
             "n_rows": int(len(group_df)),
