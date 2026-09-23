@@ -3,9 +3,6 @@ LLM Service - Main Integration Module
 Consolidated AI service supporting multiple providers and advanced analysis tasks.
 """
 
-import asyncio
-import datetime
-import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator
 
@@ -239,8 +236,6 @@ class LLMService:
         api_key=None,
         **kwargs,
     ):
-        import os
-
         # Backward compatibility for 'text' parameter
         if text_content is None:
             text_content = kwargs.get("text", "")
