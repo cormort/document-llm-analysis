@@ -3,11 +3,8 @@
 import os
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-from fastapi.responses import FileResponse
 import structlog
-
-logger = structlog.get_logger(__name__)
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 
 from app.models.reports import ReportGenerateRequest, ReportResponse, SkillInfo
@@ -15,6 +12,7 @@ from app.services.llm_service import llm_service
 from app.services.report_exporter import generate_docx_report
 from app.services.skills_registry import REPORT_TEMPLATES, SKILLS, get_skills_by_ids
 
+logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 # Upload directory path
@@ -70,7 +68,10 @@ async def generate_report(request: ReportGenerateRequest) -> ReportResponse:
         selected_skill_objs = get_skills_by_ids(request.selected_skills)
         skills_text = "\n".join([s.prompt_fragment for s in selected_skill_objs])
 
-        full_instruction = f"Template: {request.template_name}\nSkills:\n{skills_text}\n\n{request.user_instruction}"
+        full_instruction = (
+            f"Template: {request.template_name}\nSkills:\n{skills_text}\n\n"
+            f"{request.user_instruction}"
+        )
 
         if request.file_path:
             # Resolve the file path - check if it's already absolute or just filename

@@ -11,15 +11,11 @@ Features:
 """
 
 import os
-import time
 from datetime import datetime, timedelta
-from typing import Optional
 
 import chromadb
 import structlog
 from chromadb.config import Settings as ChromaSettings
-
-from app.core.config import settings
 
 logger = structlog.get_logger()
 
@@ -39,7 +35,7 @@ class ChromaDBOptimizer:
             persist_directory: ChromaDB 資料目錄
         """
         self.persist_directory = persist_directory
-        self._client: Optional[chromadb.Client] = None
+        self._client: chromadb.Client | None = None
         self._initialized = False
 
     def _lazy_init(self) -> bool:
@@ -277,7 +273,7 @@ class ChromaDBOptimizer:
         try:
             total_size = 0
 
-            for root, dirs, files in os.walk(self.persist_directory):
+            for root, _dirs, files in os.walk(self.persist_directory):
                 for file in files:
                     file_path = os.path.join(root, file)
                     total_size += os.path.getsize(file_path)

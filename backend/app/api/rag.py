@@ -1,6 +1,5 @@
 """RAG API endpoints with SSE streaming support."""
 
-import asyncio
 import json
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -9,14 +8,22 @@ from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.text_cleaner import clean_rag_content
-
 from app.models.rag import (
+    AstuteRAGQueryRequest,
+    AstuteRAGQueryResponse,
+    ConflictInfo,
     DocumentInfo,
+    InternalKnowledgeResponse,
     RAGIndexRequest,
     RAGIndexResponse,
     RAGQueryRequest,
     RAGQueryResponse,
+    ReliabilityDistribution,
+    SourceInfo,
+    VerifyAnswerRequest,
+    VerifyAnswerResponse,
 )
+from app.services.astute_rag_service import astute_rag_service
 from app.services.document_service import document_service
 from app.services.llm_service import llm_service
 from app.services.rag_service import rag_service
@@ -24,7 +31,9 @@ from app.services.rag_service import rag_service
 router = APIRouter()
 
 
-async def stream_rag_response(stream: AsyncGenerator[str, None]) -> AsyncGenerator[dict[str, str], None]:
+async def stream_rag_response(
+    stream: AsyncGenerator[str, None],
+) -> AsyncGenerator[dict[str, str], None]:
     """Stream real RAG response content via SSE with filtering."""
     from app.services.llm.stream_filter import StreamFilter
     
@@ -301,23 +310,11 @@ async def reindex_document(collection_name: str) -> dict[str, str | list[str] | 
 
 # ========== Astute RAG Endpoints ==========
 
-from app.models.rag import (
-    AstuteRAGQueryRequest,
-    AstuteRAGQueryResponse,
-    ConflictInfo,
-    InternalKnowledgeResponse,
-    ReliabilityDistribution,
-    SourceInfo,
-    VerifyAnswerRequest,
-    VerifyAnswerResponse,
-)
-from app.services.astute_rag_service import astute_rag_service
-
-
 @router.post("/astute/query", response_model=AstuteRAGQueryResponse)
 async def astute_query(request: AstuteRAGQueryRequest) -> AstuteRAGQueryResponse:
     """
-    Execute Astute RAG query with internal knowledge elicitation and reliability assessment.
+    Execute Astute RAG query with internal knowledge elicitation
+    and reliability assessment.
 
     This endpoint implements the full Astute RAG pipeline:
     1. Elicit internal knowledge from LLM

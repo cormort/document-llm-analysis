@@ -1,16 +1,16 @@
 """IP 存取控制 API 端點。"""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_admin_user
 from app.core.database import get_db
-from app.models.ip_control import IPWhitelist, IPBlacklist, IPAccessLog
+from app.models.ip_control import IPAccessLog, IPBlacklist, IPWhitelist
 from app.models.user import User
 
 router = APIRouter()
@@ -63,13 +63,13 @@ class IPAccessLogResponse(BaseModel):
 
 def check_ip_access(ip_address: str, db: Session) -> tuple[bool, str | None]:
     """檢查 IP 是否有存取權限。"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     blacklist_entry = db.execute(
         select(IPBlacklist)
         .where(
             IPBlacklist.ip_address == ip_address,
-            IPBlacklist.is_active == True,
+            IPBlacklist.is_active.is_(True),
         )
         .where((IPBlacklist.expires_at.is_(None)) | (IPBlacklist.expires_at > now))
     ).scalar_one_or_none()
@@ -78,7 +78,7 @@ def check_ip_access(ip_address: str, db: Session) -> tuple[bool, str | None]:
         return False, f"IP 在黑名單中: {blacklist_entry.reason}"
 
     whitelist_count = (
-        db.execute(select(IPWhitelist).where(IPWhitelist.is_active == True))
+        db.execute(select(IPWhitelist).where(IPWhitelist.is_active.is_(True)))
         .scalars()
         .all()
     )
@@ -87,7 +87,7 @@ def check_ip_access(ip_address: str, db: Session) -> tuple[bool, str | None]:
         in_whitelist = db.execute(
             select(IPWhitelist).where(
                 IPWhitelist.ip_address == ip_address,
-                IPWhitelist.is_active == True,
+                IPWhitelist.is_active.is_(True),
             )
         ).scalar_one_or_none()
 
@@ -204,7 +204,7 @@ def list_blacklist(
     """取得 IP 黑名單列表。"""
     query = select(IPBlacklist)
     if active_only:
-        query = query.where(IPBlacklist.is_active == True)
+        query = query.where(IPBlacklist.is_active.is_(True))
 
     entries = (
         db.execute(
@@ -242,7 +242,7 @@ def add_to_blacklist(
 
     expires_at = None
     if data.expires_days:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=data.expires_days)
+        expires_at = datetime.now(UTC) + timedelta(days=data.expires_days)
 
     entry = IPBlacklist(
         ip_address=data.ip_address,
@@ -284,7 +284,7 @@ def list_access_logs(
     limit: int = 100,
 ) -> list[IPAccessLog]:
     """取得 IP 存取記錄。"""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     query = select(IPAccessLog).filter(IPAccessLog.created_at >= start_date)
 
@@ -308,16 +308,16 @@ def get_ip_stats(
     days: int = 7,
 ) -> dict:
     """取得 IP 統計資訊。"""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    start_date = datetime.now(UTC) - timedelta(days=days)
 
     whitelist_count = (
-        db.execute(select(IPWhitelist).where(IPWhitelist.is_active == True))
+        db.execute(select(IPWhitelist).where(IPWhitelist.is_active.is_(True)))
         .scalars()
         .all()
     )
 
     blacklist_count = (
-        db.execute(select(IPBlacklist).where(IPBlacklist.is_active == True))
+        db.execute(select(IPBlacklist).where(IPBlacklist.is_active.is_(True)))
         .scalars()
         .all()
     )
@@ -325,7 +325,7 @@ def get_ip_stats(
     blocked_logs = (
         db.execute(
             select(IPAccessLog).where(
-                IPAccessLog.is_blocked == True,
+                IPAccessLog.is_blocked.is_(True),
                 IPAccessLog.created_at >= start_date,
             )
         )

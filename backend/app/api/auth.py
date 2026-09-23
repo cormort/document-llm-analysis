@@ -1,6 +1,6 @@
 """認證 API 端點：註冊、登入、登出、取得當前用戶。"""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status

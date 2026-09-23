@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class Skill:
     id: str
@@ -16,7 +17,10 @@ SKILLS: dict[str, Skill] = {
         name="📊 財務稽核 (Finance Auditor)",
         category="財務",
         icon="📊",
-        description="深度財務審查，包含 NPV/IRR 驗算、折現率合理性評估與現金流敏感度分析。",
+        description=(
+            "深度財務審查，包含 NPV/IRR 驗算、"
+            "折現率合理性評估與現金流敏感度分析。"
+        ),
         prompt_fragment="""
 ### 📊 專家技能：財務稽核 (Finance Audit Scrutiny)
 請以資深財務稽核員的立場，對專案的財務假設進行「嚴謹審查」：
@@ -40,7 +44,7 @@ SKILLS: dict[str, Skill] = {
 - 營運成本與維護費用的完整性（是否遺漏隱藏成本）
 
 **E. 最終判定**：基於財務面給出明確的建議、需補充資料或不建議推動之理由。
-"""
+""",
     ),
     "strategy_consultant": Skill(
         id="strategy_consultant",
@@ -56,7 +60,7 @@ SKILLS: dict[str, Skill] = {
    - **Ansoff / SWOT**：分析擴張方向或現狀競爭優勢。
    - **商業生命週期**：判斷目前專案處於哪個發展階段（啟動、成長、成熟或轉型期）。
 2. **策略高度**：不僅描述現狀，更要給出對未來規劃有具體引導性的對策建議。
-"""
+""",
     ),
     "kpi_analyst": Skill(
         id="kpi_analyst",
@@ -72,7 +76,7 @@ SKILLS: dict[str, Skill] = {
 3. **品質評估**：是否兼顧領先指標（前瞻性）與落後指標（結果性）？
 4. **古德哈特定律風險**：是否存在「為達標而扭曲行為」的風險？
 5. **優化建議**：提出更能反映核心價值的替代性指標或監測機制。
-"""
+""",  # noqa: E501
     ),
     "logical_integrity": Skill(
         id="logical_integrity",
@@ -95,7 +99,7 @@ SKILLS: dict[str, Skill] = {
 
 **C. 需進一步釐清的疑慮**：
 - 以問題清單形式列出需要主辦機關進一步回應、質疑或說明的核心事項。
-"""
+""",
     ),
     "policy_compliance": Skill(
         id="policy_compliance",
@@ -109,7 +113,7 @@ SKILLS: dict[str, Skill] = {
 1. **法規風險**：評估專案內容是否有違反現行法規或程序之疑慮。
 2. **政策一致性**：分析該計畫是否符合政府的長期發展方向（如：淨零排放、數位轉型等）。
 3. **社會責任與公平性**：探討計畫對不同社會群體、弱勢族群或環境之潛在影響。
-"""
+""",
     ),
     "technical_feasibility": Skill(
         id="technical_feasibility",
@@ -123,7 +127,7 @@ SKILLS: dict[str, Skill] = {
 1. **執行能力稽核**：評估現有人力或組織是否具備執行此技術路徑的「合格專業力」。
 2. **技術更迭風險**：預判所採購的技術或設備是否在短期內面臨淘、維護困難或供應鏈受阻。
 3. **基礎設施成熟度**：分析外部環境（如：電力、通訊、數據底層）是否足以支撐該技術落地。
-"""
+""",
     ),
     "data_analyst": Skill(
         id="data_analyst",
@@ -139,14 +143,17 @@ SKILLS: dict[str, Skill] = {
 3. **趨勢與對比**：對比不同時段、不同計畫或不同部門間的數據差異，分析其增減趨勢與背後原因。
 4. **異常值偵測**：識別異常高的成本、異常低的執行率或過於理想化的統計指標。
 5. **數據決策建議**：基於數據分析結果，給出具體的資源配置優化或風險防範建議。
-"""
+""",  # noqa: E501
     ),
     "precise_extraction": Skill(
         id="precise_extraction",
         name="🎯 精確提取 (Precise Extraction)",
         category="分析",
         icon="🎯",
-        description="專為 RAG 問答設計，強制 LLM 精確提取原文數值、日期、金額，杜絕推測與幻覺。",
+        description=(
+            "專為 RAG 問答設計，強制 LLM 精確提取原文數值、日期、金額，"
+            "杜絕推測與幻覺。"
+        ),
         prompt_fragment="""
 ### 🎯 專家技能：精確數據提取 (Precise Data Extraction)
 回答問題時請嚴格遵守以下規則：
@@ -164,7 +171,7 @@ SKILLS: dict[str, Skill] = {
 - 若原文數據模糊或不完整，明確標示「⚠️ 原文未明確提及」
 - 若需要推算，用「推算：...（依據：...）」格式區分推算與原始數據
 - 禁止在沒有原文依據的情況下給出任何數字
-"""
+""",
     ),
 }
 
@@ -187,7 +194,12 @@ REPORT_TEMPLATES: dict[str, dict] = {
     "professional": {
         "name": "📋 專業全貌報告",
         "description": "適合深度財務、政策與可行性分析",
-        "recommended_skills": ["finance_audit", "logical_integrity", "kpi_analyst", "strategy_consultant"],
+        "recommended_skills": [
+            "finance_audit",
+            "logical_integrity",
+            "kpi_analyst",
+            "strategy_consultant",
+        ],
         "system_prompt": "",  # 使用預設 prompt + skill 拼接
         "temperature": 0.2,
     },
@@ -207,8 +219,15 @@ REPORT_TEMPLATES: dict[str, dict] = {
     },
     "engineering_review": {
         "name": "🏗️ 工程計畫審查報告",
-        "description": "國家級公共建設與特別預算審查，含規模量體、環評、全生命週期 O&M 查核",
-        "recommended_skills": ["finance_audit", "technical_feasibility", "kpi_analyst", "logical_integrity"],
+        "description": (
+            "國家級公共建設與特別預算審查，含規模量體、環評、全生命週期 O&M 查核"
+        ),
+        "recommended_skills": [
+            "finance_audit",
+            "technical_feasibility",
+            "kpi_analyst",
+            "logical_integrity",
+        ],
         "system_prompt": """【角色設定】
 你是一位具備國家級公共建設計畫與特別預算審查經驗的「資深計畫評估委員與財務審查專家」。你熟悉計畫管考作業、預算編製程序，且具備敏銳的風險控管能力。你的風格嚴謹、客觀，能看穿計畫書中過度樂觀的假設，並精準點出財務與執行面的潛在隱患。
 
@@ -275,13 +294,20 @@ REPORT_TEMPLATES: dict[str, dict] = {
 🚩 關鍵風險警示 (Red Flags)：(條列 1~3 點本計畫最致命的財務或執行風險，並給予具體的修改或退回重審建議)
 
 【附錄資料轉換】
-請確保所有輸出皆可被解析，並在最後額外提供一個僅包含【計畫總經費】、【政府補助佔比】、【自償率】與【綜合評價】的 JSON 格式摘要。""",
+請確保所有輸出皆可被解析，並在最後額外提供一個僅包含【計畫總經費】、【政府補助佔比】、【自償率】與【綜合評價】的 JSON 格式摘要。""",  # noqa: E501
         "temperature": 0.05,  # 工程審查：最嚴格的事實萃取
     },
     "subsidy_review": {
         "name": "📜 補助與施政計畫審查報告",
-        "description": "政府補助計畫與施政計畫審查，含補助必要性、退場機制、KPI 效度批判",
-        "recommended_skills": ["finance_audit", "kpi_analyst", "policy_compliance", "logical_integrity"],
+        "description": (
+            "政府補助計畫與施政計畫審查，含補助必要性、退場機制、KPI 效度批判"
+        ),
+        "recommended_skills": [
+            "finance_audit",
+            "kpi_analyst",
+            "policy_compliance",
+            "logical_integrity",
+        ],
         "system_prompt": """【角色設定】
 你是一位具備國家級預算審查、施政計畫管考與特種基金效益評估經驗的「資深政策評估與財務審查委員」。你對於「資源錯置」、「補助依賴」及「無效績效指標（Vanity Metrics）」具備極高的敏銳度。你的風格嚴謹、客觀，能看穿計畫書中過度包裝的政策宣傳，並精準點出政府財政負擔與成效評估的漏洞。
 
@@ -333,7 +359,7 @@ REPORT_TEMPLATES: dict[str, dict] = {
 🚩 關鍵政策風險 (Red Flags)：(條列 1~3 點本計畫在「資金濫用」、「KPI 虛設」或「缺乏永續性」上最致命的隱患，並給予具體的修正或退回建議)
 
 【附錄資料轉換】
-請確保所有輸出皆可被解析，並在最後額外提供一個僅包含【計畫總經費】、【政府負擔佔比】、【核心結果指標(Outcome KPI)】與【綜合評價】的 JSON 格式摘要。""",
+請確保所有輸出皆可被解析，並在最後額外提供一個僅包含【計畫總經費】、【政府負擔佔比】、【核心結果指標(Outcome KPI)】與【綜合評價】的 JSON 格式摘要。""",  # noqa: E501
         "temperature": 0.05,  # 補助審查：最嚴格的事實萃取
     },
     "policy": {

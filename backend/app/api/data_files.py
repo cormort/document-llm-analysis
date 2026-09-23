@@ -32,7 +32,9 @@ async def list_data_files() -> DataFileListResponse:
     """列出 uploads 目錄中所有數據檔案。"""
     files: list[DataFileInfo] = []
     if ABS_UPLOAD_DIR.exists():
-        for f in sorted(ABS_UPLOAD_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        for f in sorted(
+            ABS_UPLOAD_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True
+        ):
             if f.is_file() and f.suffix.lower() in DATA_EXTENSIONS:
                 stat = f.stat()
                 files.append(DataFileInfo(

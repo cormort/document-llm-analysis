@@ -2,8 +2,9 @@
 
 from typing import Any
 
-from app.models.llm import LLMConfig
 from pydantic import BaseModel, Field
+
+from app.models.llm import LLMConfig
 
 
 class ColumnFilter(BaseModel):
@@ -86,7 +87,13 @@ class EDAResponse(BaseModel):
 
 class StatTestRequest(BaseModel):
     file_path: str
-    test_type: str = Field(..., description="ttest, anova, shapiro, outliers, chi_square, mann_whitney, kruskal, wilcoxon")
+    test_type: str = Field(
+        ...,
+        description=(
+            "ttest, anova, shapiro, outliers, chi_square, mann_whitney, "
+            "kruskal, wilcoxon"
+        ),
+    )
     target_columns: list[str]
     group_column: str | None = None
     filters: list[ColumnFilter] = []

@@ -32,7 +32,11 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """初始化資料庫表格。"""
     from app.models.analytics import AnalyticsEvent  # noqa: F401
-    from app.models.ip_control import IPAccessLog, IPBlacklist, IPWhitelist  # noqa: F401
+    from app.models.ip_control import (  # noqa: F401
+        IPAccessLog,
+        IPBlacklist,
+        IPWhitelist,
+    )
     from app.models.user import User  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

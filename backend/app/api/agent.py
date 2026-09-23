@@ -1,12 +1,13 @@
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from app.agent.graph import graph
 from fastapi import APIRouter
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+
+from app.agent.graph import graph
 
 router = APIRouter()
 
@@ -63,4 +64,8 @@ async def stream_agent_generator(
 @router.post("/chat", response_class=EventSourceResponse)
 async def chat_agent(request: AgentChatRequest):
     """Chat with the agent via SSE."""
-    return EventSourceResponse(stream_agent_generator(request.message, request.thread_id or "default", request.llm_config))
+    return EventSourceResponse(
+        stream_agent_generator(
+            request.message, request.thread_id or "default", request.llm_config
+        )
+    )

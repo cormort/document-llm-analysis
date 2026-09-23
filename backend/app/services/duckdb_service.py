@@ -69,18 +69,20 @@ class DuckDBService:
         try:
             if suffix == ".csv":
                 self.conn.execute(
-                    f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_csv_auto(?)",
+                    f"CREATE OR REPLACE TABLE {table_name} "
+                    "AS SELECT * FROM read_csv_auto(?)",
                     [str(path)],
                 )
             elif suffix in [".xlsx", ".xls"]:
                 # DuckDB can read Excel via spatial extension or we load via pandas
-                df = pd.read_excel(path)
+                df = pd.read_excel(path)  # noqa: F841 - read by DuckDB replacement scan
                 self.conn.execute(
                     f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df"
                 )
             elif suffix == ".json":
                 self.conn.execute(
-                    f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_json_auto(?)",
+                    f"CREATE OR REPLACE TABLE {table_name} "
+                    "AS SELECT * FROM read_json_auto(?)",
                     [str(path)],
                 )
             else:

@@ -1,6 +1,5 @@
 """Tests for file resolver utilities."""
 
-import pytest
 
 from app.utils.file_resolver import (
     convert_numpy_types,

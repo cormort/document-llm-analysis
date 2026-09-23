@@ -9,12 +9,16 @@ import os
 from datetime import datetime
 
 import structlog
+
 from app.services.rag_service import rag_service
 
 logger = structlog.get_logger()
 
 # Data directory
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+DATA_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
+)
+
 
 class ProjectService:
     def __init__(self, projects_file: str = None):
@@ -76,13 +80,17 @@ class ProjectService:
             if proj['id'] == project_id:
                 return proj
         return None
-    
-    def update_project(self, project_id: str, name: str = None, description: str = None) -> bool:
+
+    def update_project(
+        self, project_id: str, name: str = None, description: str = None
+    ) -> bool:
         """Update project info"""
         for proj in self.projects:
             if proj['id'] == project_id:
-                if name: proj['name'] = name
-                if description is not None: proj['description'] = description
+                if name:
+                    proj['name'] = name
+                if description is not None:
+                    proj['description'] = description
                 proj['updated_at'] = datetime.now().isoformat()
                 self._save_projects()
                 return True
@@ -126,7 +134,8 @@ class ProjectService:
     def get_project_stats(self, project_id: str) -> dict:
         """Get project statistics"""
         proj = self.get_project(project_id)
-        if not proj: return {}
+        if not proj:
+            return {}
         
         collections = proj.get('collections', [])
         total_chunks = 0
@@ -136,7 +145,9 @@ class ProjectService:
         indexed_docs = rag_service.list_indexed_documents()
         
         for col_name in collections:
-            doc = next((d for d in indexed_docs if d['collection_name'] == col_name), None)
+            doc = next(
+                (d for d in indexed_docs if d["collection_name"] == col_name), None
+            )
             if doc:
                 total_chunks += doc.get('count', 0)
         

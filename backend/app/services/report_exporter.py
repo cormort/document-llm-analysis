@@ -22,8 +22,8 @@ def generate_docx_report(title: str, content: str, output_path: str) -> str:
         The output_path of the generated file
     """
     from docx import Document
-    from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt, RGBColor
 
     doc = Document()
 
@@ -298,7 +298,7 @@ def generate_html_report(title: str, content: str, chart_html: str = None) -> st
         </div>
         
         <div class="content">
-            {f'<div class="chart-container">{chart_html}</div>' if chart_html else ''}
+            {f'<div class="chart-container">{chart_html}</div>' if chart_html else ""}
             {html_content}
         </div>
         
@@ -308,7 +308,7 @@ def generate_html_report(title: str, content: str, chart_html: str = None) -> st
     </div>
 </body>
 </html>
-"""
+"""  # noqa: E501
     return html_template
 
 

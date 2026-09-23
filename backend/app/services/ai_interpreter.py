@@ -6,6 +6,7 @@ across different statistical analysis contexts.
 """
 
 import pandas as pd
+
 from app.services.llm_service import llm_service
 
 
@@ -21,27 +22,27 @@ async def interpret_diagnostics(
     """
     Generate AI interpretation for data diagnostics.
     """
-    MAX_ROWS = 20
-    MAX_COLS = 15
+    max_rows = 20
+    max_cols = 15
 
     stats_df = descriptive_stats
-    if len(stats_df) > MAX_ROWS:
-        stats_df = stats_df.iloc[:MAX_ROWS]
-    if len(stats_df.columns) > MAX_COLS:
-        stats_df = stats_df.iloc[:, :MAX_COLS]
+    if len(stats_df) > max_rows:
+        stats_df = stats_df.iloc[:max_rows]
+    if len(stats_df.columns) > max_cols:
+        stats_df = stats_df.iloc[:, :max_cols]
 
     stats_str = stats_df.to_markdown()
 
     if quality_report is not None:
         quality_df = quality_report
-        if len(quality_df) > MAX_ROWS:
-            quality_df = quality_df.iloc[:MAX_ROWS]
+        if len(quality_df) > max_rows:
+            quality_df = quality_df.iloc[:max_rows]
         quality_str = quality_df.to_markdown()
     else:
         quality_str = "N/A"
 
     note = (
-        f"(註：為避免超過上下文上限，僅顯示前 {MAX_ROWS} 筆數據與前 {MAX_COLS} 個欄位)"
+        f"(註：為避免超過上下文上限，僅顯示前 {max_rows} 筆數據與前 {max_cols} 個欄位)"
     )
 
     prompt = f"""請針對以下描述性統計與資料品質診斷結果進行深度分析 {note}：
@@ -78,14 +79,14 @@ async def interpret_correlation(
     context_window: int = 16384,
 ) -> str:
     """Generate AI interpretation for correlation matrix."""
-    MAX_DIM = 12
+    max_dim = 12
 
-    truncated_matrix = corr_matrix.iloc[:MAX_DIM, :MAX_DIM]
+    truncated_matrix = corr_matrix.iloc[:max_dim, :max_dim]
     corr_str = truncated_matrix.to_markdown()
 
     note = (
-        f"(註：為避免超過 Token 上限，僅顯示前 {MAX_DIM}x{MAX_DIM} 的矩陣切片)"
-        if (len(corr_matrix) > MAX_DIM or len(corr_matrix.columns) > MAX_DIM)
+        f"(註：為避免超過 Token 上限，僅顯示前 {max_dim}x{max_dim} 的矩陣切片)"
+        if (len(corr_matrix) > max_dim or len(corr_matrix.columns) > max_dim)
         else ""
     )
 
@@ -136,10 +137,10 @@ async def interpret_chart(
     )
 
     # Aggressive limit: 1500 chars (approx 500-1000 tokens)
-    LIMIT_CHARS = 1500
+    limit_chars = 1500
     truncated_summary = (
-        data_summary[:LIMIT_CHARS] + "...(truncated)"
-        if len(data_summary) > LIMIT_CHARS
+        data_summary[:limit_chars] + "...(truncated)"
+        if len(data_summary) > limit_chars
         else data_summary
     )
 
@@ -286,7 +287,7 @@ async def interpret_field_implications(
 2. **🏢 業務/政策意涵**：針對此指標的表現，反映了什麼樣的現況或問題？
 3. **⚠️ 風險與機會**：是否有異常集中的極端值需要特別關注？或是分佈過於分散導致管理困難？
 4. **🎯 行動建議**：管理者應該制定什麼樣的 KPI 或政策來優化此指標？
-"""
+"""  # noqa: E501
 
     return await llm_service.analyze_text(
         text_content="",
@@ -326,7 +327,7 @@ async def suggest_feature_engineering(
 3. **分析價值** (為什麼這個新欄位比原欄位更有意義？)
 
 請用繁體中文回覆。
-"""
+"""  # noqa: E501
 
     return await llm_service.analyze_text(
         text_content="",
@@ -371,7 +372,7 @@ async def interpret_dataset_holistically(
     基於這些變數的共同表現，管理者應該採取什麼樣的整體策略？(而非針對單一欄位的微調)
 
 請用 Markdown 格式輸出，語氣專業且具啟發性。
-"""
+"""  # noqa: E501
 
     return await llm_service.analyze_text(
         text_content="",

@@ -1,10 +1,9 @@
 """建立初始管理員帳號。"""
 
-from sqlalchemy import select
-
 from backend.app.core.database import SessionLocal, init_db
 from backend.app.core.security import get_password_hash
 from backend.app.models.user import User
+from sqlalchemy import select
 
 
 def create_admin():
@@ -19,7 +18,7 @@ def create_admin():
 
         if existing_admin:
             print("管理員帳號已存在")
-            print(f"用戶名: admin")
+            print("用戶名: admin")
             print("如需重設密碼，請手動修改資料庫")
             return
 
@@ -37,9 +36,9 @@ def create_admin():
         print("=" * 50)
         print("初始管理員帳號已建立")
         print("=" * 50)
-        print(f"用戶名: admin")
-        print(f"密碼: admin123456")
-        print(f"Email: admin@example.com")
+        print("用戶名: admin")
+        print("密碼: admin123456")
+        print("Email: admin@example.com")
         print("=" * 50)
         print("請登入後立即修改密碼！")
         print("=" * 50)

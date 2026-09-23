@@ -7,12 +7,17 @@ import structlog
 logger = structlog.get_logger()
 
 # Define data directory for backend
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+DATA_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
+)
+
 
 class GraphRAGService:
     def __init__(self, persist_path: str = None):
         """Initialize Graph RAG Service"""
-        self.persist_path = persist_path or os.path.join(DATA_DIR, "knowledge_graph.json")
+        self.persist_path = persist_path or os.path.join(
+            DATA_DIR, "knowledge_graph.json"
+        )
         self.graph = nx.Graph()
         self._load_graph()
 
@@ -24,7 +29,9 @@ class GraphRAGService:
                     data = json.load(f)
                     # Reconstruct NetworkX Graph
                     for node_data in data.get("nodes", []):
-                        self.graph.add_node(node_data["id"], **node_data.get("metadata", {}))
+                        self.graph.add_node(
+                            node_data["id"], **node_data.get("metadata", {})
+                        )
                     for edge_data in data.get("edges", []):
                         self.graph.add_edge(
                             edge_data["source"], 
@@ -32,7 +39,9 @@ class GraphRAGService:
                             relation=edge_data.get("relation", ""),
                             weight=edge_data.get("weight", 1.0)
                         )
-                logger.info("Loaded Knowledge Graph", nodes=self.graph.number_of_nodes())
+                logger.info(
+                    "Loaded Knowledge Graph", nodes=self.graph.number_of_nodes()
+                )
             except Exception as e:
                 logger.error("Failed to load graph", error=str(e))
                 self.graph = nx.Graph()
@@ -43,16 +52,19 @@ class GraphRAGService:
         """Save graph to file"""
         try:
             data = {
-                "nodes": [{"id": n, "metadata": self.graph.nodes[n]} for n in self.graph.nodes()],
+                "nodes": [
+                    {"id": n, "metadata": self.graph.nodes[n]}
+                    for n in self.graph.nodes()
+                ],
                 "edges": [
                     {
-                        "source": u, 
-                        "target": v, 
-                        "relation": d.get("relation", ""), 
-                        "weight": d.get("weight", 1.0)
-                    } 
+                        "source": u,
+                        "target": v,
+                        "relation": d.get("relation", ""),
+                        "weight": d.get("weight", 1.0),
+                    }
                     for u, v, d in self.graph.edges(data=True)
-                ]
+                ],
             }
             os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
             with open(self.persist_path, 'w', encoding='utf-8') as f:
@@ -74,22 +86,32 @@ class GraphRAGService:
         # 2. Process Entities
         for ent in entities:
             name = ent.get("name", "").strip()
-            if not name: continue
+            if not name:
+                continue
             
             # Entity Node
             if name not in self.graph:
-                self.graph.add_node(name, type="entity", aliases=ent.get("aliases", []), ent_type=ent.get("type", ""))
-            
+                self.graph.add_node(
+                    name,
+                    type="entity",
+                    aliases=ent.get("aliases", []),
+                    ent_type=ent.get("type", ""),
+                )
+
             # Document -> Entity (describes)
-            self.graph.add_edge(chunk_id, name, relation="describes", type="describes", weight=1.0)
-            
+            self.graph.add_edge(
+                chunk_id, name, relation="describes", type="describes", weight=1.0
+            )
+
             # Description Node
             desc_text = ent.get("description", "").strip()
             if desc_text:
                 desc_id = f"desc_{hash(desc_text)}"
                 self.graph.add_node(desc_id, type="description", text=desc_text)
                 # Description -> Entity (describes)
-                self.graph.add_edge(desc_id, name, relation="describes", type="describes", weight=1.0)
+                self.graph.add_edge(
+                    desc_id, name, relation="describes", type="describes", weight=1.0
+                )
 
         # 3. Process Relations (Entity -> Entity)
         for rel in relations:
@@ -97,7 +119,8 @@ class GraphRAGService:
             obj = rel.get("object", "").strip()
             rel_text = rel.get("relation", "").strip()
             
-            if not sub or not obj: continue
+            if not sub or not obj:
+                continue
             
             # Ensure nodes exist
             for node in [sub, obj]:
@@ -106,9 +129,13 @@ class GraphRAGService:
             
             # Create or update related_to edge
             if self.graph.has_edge(sub, obj):
-                self.graph[sub][obj]['weight'] = self.graph[sub][obj].get('weight', 1.0) + 0.1
+                self.graph[sub][obj]["weight"] = (
+                    self.graph[sub][obj].get("weight", 1.0) + 0.1
+                )
             else:
-                self.graph.add_edge(sub, obj, type="related_to", relation=rel_text, weight=1.0)
+                self.graph.add_edge(
+                    sub, obj, type="related_to", relation=rel_text, weight=1.0
+                )
 
     def spreading_activation(
         self, 
@@ -132,7 +159,8 @@ class GraphRAGService:
         queue = collections.deque(seed_entities)
         
         for _ in range(max_steps):
-            if not queue: break
+            if not queue:
+                break
             level_size = len(queue)
             for _ in range(level_size):
                 u = queue.popleft()
@@ -144,7 +172,8 @@ class GraphRAGService:
                     
                     # Edge Rescaling
                     w_prime = max(0, (w - c) / (1 - c)) if w > c else 0
-                    if w_prime == 0: continue
+                    if w_prime == 0:
+                        continue
                     
                     # Propagation
                     delta = ai * w_prime * decay

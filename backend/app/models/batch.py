@@ -1,7 +1,8 @@
 """Pydantic models for Batch Analysis API."""
 
-from app.models.llm import LLMConfig
 from pydantic import BaseModel, Field
+
+from app.models.llm import LLMConfig
 
 
 class BatchAnalyzeRequest(BaseModel):
@@ -10,7 +11,9 @@ class BatchAnalyzeRequest(BaseModel):
     file_path: str = Field(..., description="Path to the data file")
     group_by_cols: list[str] = Field(..., description="Columns to group by")
     metric_cols: list[str] = Field(..., description="Columns to analyze")
-    analysis_mode: str = Field(default="pairwise", description="'pairwise' or 'consolidated'")
+    analysis_mode: str = Field(
+        default="pairwise", description="'pairwise' or 'consolidated'"
+    )
     currency_unit: str = Field(default="TWD", description="Currency unit for analysis")
     config: LLMConfig = Field(default_factory=LLMConfig)
 

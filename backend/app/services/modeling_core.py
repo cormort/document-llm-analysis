@@ -1,55 +1,69 @@
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any, List, Optional
+import pandas as pd
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    auc,
+    confusion_matrix,
+    f1_score,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_curve,
+)
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score, mean_squared_error, accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve, auc
 from sklearn.preprocessing import LabelEncoder
+
 
 def train_linear_regression(
     df: pd.DataFrame, 
     feature_cols: list[str], 
     target_col: str, 
     test_size: float = 0.2
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Train a linear regression model.
     """
     # Prepare data
-    X = df[feature_cols].copy()
+    x = df[feature_cols].copy()
     y = df[target_col].copy()
     
     # Handle missing values by dropping
-    data = pd.concat([X, y], axis=1).dropna()
-    X = data[feature_cols]
+    data = pd.concat([x, y], axis=1).dropna()
+    x = data[feature_cols]
     y = data[target_col]
     
-    if len(X) < 10:
+    if len(x) < 10:
         raise ValueError("Not enough data to train model (minimum 10 samples)")
         
     # Split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
-    
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=test_size, random_state=42
+    )
+
     # Train
     model = LinearRegression()
-    model.fit(X_train, y_train)
+    model.fit(x_train, y_train)
     
     # Predict
-    y_pred = model.predict(X_test)
+    y_pred = model.predict(x_test)
     
     # Metrics
     r2 = r2_score(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
     
     # Feature Importance (Coefficients)
-    coefficients = dict(zip(feature_cols, model.coef_))
+    coefficients = dict(zip(feature_cols, model.coef_, strict=True))
     
     # Normalized Importance
     abs_coefs = np.abs(model.coef_)
     total = abs_coefs.sum() if abs_coefs.sum() > 0 else 1.0
     importance = [
         {"feature": f, "importance": float(abs_c / total)}
-        for f, abs_c in zip(feature_cols, abs_coefs)
+        for f, abs_c in zip(feature_cols, abs_coefs, strict=True)
     ]
     
     return {
@@ -61,7 +75,7 @@ def train_linear_regression(
         "predictions": y_pred.tolist(),
         "actual": y_test.tolist(),
         "feature_importance": importance,
-        "sample_size": len(X)
+        "sample_size": len(x)
     }
 
 def train_logistic_regression(
@@ -69,20 +83,20 @@ def train_logistic_regression(
     feature_cols: list[str], 
     target_col: str, 
     test_size: float = 0.2
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Train a logistic regression model for classification.
     """
     # Prepare data
-    X = df[feature_cols].copy()
+    x = df[feature_cols].copy()
     y = df[target_col].copy()
     
     # Clean data
-    data = pd.concat([X, y], axis=1).dropna()
-    X = data[feature_cols]
+    data = pd.concat([x, y], axis=1).dropna()
+    x = data[feature_cols]
     y = data[target_col]
     
-    if len(X) < 10:
+    if len(x) < 10:
         raise ValueError("Not enough data to train model (minimum 10 samples)")
 
     # Check if target is categorical/string and encode if necessary
@@ -91,24 +105,32 @@ def train_logistic_regression(
     classes = le.classes_.tolist()
     
     # Split
-    X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=test_size, random_state=42, stratify=y_encoded)
-    
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y_encoded, test_size=test_size, random_state=42, stratify=y_encoded
+    )
+
     # Train (using liblinear for small datasets standard)
     model = LogisticRegression(max_iter=1000)
-    model.fit(X_train, y_train)
+    model.fit(x_train, y_train)
     
     # Predict
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1] if len(classes) == 2 else None # Only for binary currently
-    
+    y_pred = model.predict(x_test)
+    y_prob = (
+        model.predict_proba(x_test)[:, 1] if len(classes) == 2 else None
+    )  # Only for binary currently
+
     # Metrics
     accuracy = accuracy_score(y_test, y_pred)
     
     metrics = {
         "accuracy": float(accuracy),
-        "precision": float(precision_score(y_test, y_pred, average='weighted', zero_division=0)),
-        "recall": float(recall_score(y_test, y_pred, average='weighted', zero_division=0)),
-        "f1": float(f1_score(y_test, y_pred, average='weighted', zero_division=0))
+        "precision": float(
+            precision_score(y_test, y_pred, average="weighted", zero_division=0)
+        ),
+        "recall": float(
+            recall_score(y_test, y_pred, average="weighted", zero_division=0)
+        ),
+        "f1": float(f1_score(y_test, y_pred, average="weighted", zero_division=0)),
     }
     
     # Confusion Matrix
@@ -119,9 +141,9 @@ def train_logistic_regression(
         # Multiclass: coef_ is (n_classes, n_features) - take average abs or max?
         # For simplicity, let's take mean absolute impact
         avg_coef = np.mean(np.abs(model.coef_), axis=0)
-        coefficients = dict(zip(feature_cols, avg_coef))
+        coefficients = dict(zip(feature_cols, avg_coef, strict=True))
     else:
-        coefficients = dict(zip(feature_cols, model.coef_[0]))
+        coefficients = dict(zip(feature_cols, model.coef_[0], strict=True))
 
     # Feature Importance
     abs_coefs = np.array(list(coefficients.values()))
@@ -153,5 +175,5 @@ def train_logistic_regression(
         "predictions": le.inverse_transform(y_pred).tolist(), # Return original labels
         "actual": le.inverse_transform(y_test).tolist(),
         "feature_importance": importance,
-        "sample_size": len(X)
+        "sample_size": len(x)
     }

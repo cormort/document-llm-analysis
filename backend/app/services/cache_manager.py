@@ -11,7 +11,7 @@ Features:
 """
 
 import os
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -76,7 +76,7 @@ class CacheManager:
         prompt: str,
         system_prompt: str = "",
         model: str = "",
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """查詢快取。"""
         if not self._lazy_init():
             return None

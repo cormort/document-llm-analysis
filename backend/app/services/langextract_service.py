@@ -76,7 +76,10 @@ class LangExtractService:
 
             self._lx = lx
             self._available = True
-            logger.info("LangExtract 模組載入成功", version=getattr(lx, "__version__", "unknown"))
+            logger.info(
+                "LangExtract 模組載入成功",
+                version=getattr(lx, "__version__", "unknown"),
+            )
         except ImportError as e:
             logger.warning("LangExtract 模組未安裝", error=str(e))
             self._available = False
@@ -133,7 +136,9 @@ class LangExtractService:
         lx = self._lx
 
         # 選擇範本或使用自訂設定
-        template = EXTRACTION_TEMPLATES.get(extraction_type, EXTRACTION_TEMPLATES["key_facts"])
+        template = EXTRACTION_TEMPLATES.get(
+            extraction_type, EXTRACTION_TEMPLATES["key_facts"]
+        )
         prompt = custom_prompt if custom_prompt else template["prompt"]
         classes = custom_classes if custom_classes else template["classes"]
 
@@ -183,7 +188,9 @@ class LangExtractService:
                 "extractions": extractions,
                 "html_visualization": html_content,
                 "total_count": len(extractions),
-                "classes_found": list({e.get("class") for e in extractions if e.get("class")}),
+                "classes_found": list(
+                    {e.get("class") for e in extractions if e.get("class")}
+                ),
             }
 
         except Exception as e:
@@ -218,7 +225,9 @@ class LangExtractService:
 
         # 本地 LLM (LM Studio / Ollama / etc.)
         # 使用 OpenAI-compatible 端點，但需要 fence_output
-        if any(p in provider for p in ["Local", "LM Studio", "Ollama", "Osaurus", "Exo"]):
+        if any(
+            p in provider for p in ["Local", "LM Studio", "Ollama", "Osaurus", "Exo"]
+        ):
             model_id = model_name or "qwen2.5:7b"
             # 本地 LLM 通常使用 Ollama 端點格式
             model_url = local_url.replace("/v1", "").rstrip("/")
@@ -298,10 +307,16 @@ class LangExtractService:
                 # 先儲存到臨時檔案
                 import tempfile
 
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".jsonl", delete=False
+                ) as f:
                     temp_path = f.name
                     if hasattr(result, "extractions"):
-                        lx.io.save_annotated_documents([result], output_name=os.path.basename(temp_path), output_dir=os.path.dirname(temp_path))
+                        lx.io.save_annotated_documents(
+                            [result],
+                            output_name=os.path.basename(temp_path),
+                            output_dir=os.path.dirname(temp_path),
+                        )
 
                     # 產生 HTML
                     html_content = lx.visualize(temp_path)
@@ -331,21 +346,28 @@ class LangExtractService:
             "<html><head><meta charset='utf-8'>",
             "<title>LangExtract 提取結果</title>",
             "<style>",
-            "body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }",
+            "body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; "
+            "margin: 0 auto; padding: 20px; background: #f5f5f5; }",
             ".container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }",
-            ".panel { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }",
-            ".extraction { padding: 10px; margin: 5px 0; border-radius: 4px; border-left: 4px solid; }",
+            ".panel { background: white; border-radius: 8px; padding: 20px; "
+            "box-shadow: 0 2px 4px rgba(0,0,0,0.1); }",
+            ".extraction { padding: 10px; margin: 5px 0; border-radius: 4px; "
+            "border-left: 4px solid; }",
             ".extraction:hover { background: #f0f0f0; }",
-            ".class-revenue, .class-fact { border-color: #4CAF50; background: #E8F5E9; }",
-            ".class-change, .class-statistic { border-color: #2196F3; background: #E3F2FD; }",
+            ".class-revenue, .class-fact { "
+            "border-color: #4CAF50; background: #E8F5E9; }",
+            ".class-change, .class-statistic { "
+            "border-color: #2196F3; background: #E3F2FD; }",
             ".class-date { border-color: #FF9800; background: #FFF3E0; }",
-            ".class-amount, .class-cost { border-color: #9C27B0; background: #F3E5F5; }",
+            ".class-amount, .class-cost { "
+            "border-color: #9C27B0; background: #F3E5F5; }",
             ".class-person { border-color: #E91E63; background: #FCE4EC; }",
             ".class-organization { border-color: #00BCD4; background: #E0F2F1; }",
             ".text { font-weight: 500; }",
             ".attrs { font-size: 0.85em; color: #666; margin-top: 5px; }",
             "h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }",
-            ".source { white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6; }",
+            ".source { white-space: pre-wrap; font-family: monospace; "
+            "font-size: 0.9em; line-height: 1.6; }",
             "mark { background: #FFEB3B; padding: 2px 4px; border-radius: 2px; }",
             "</style></head><body>",
             "<h1>🎯 LangExtract 提取結果</h1>",
@@ -358,7 +380,9 @@ class LangExtractService:
             cls = ext.get("class", "unknown")
             text = ext.get("text", "")
             attrs = ext.get("attributes", {})
-            attrs_str = ", ".join(f"{k}: {v}" for k, v in attrs.items()) if attrs else ""
+            attrs_str = (
+                ", ".join(f"{k}: {v}" for k, v in attrs.items()) if attrs else ""
+            )
 
             html_parts.append(
                 f"<div class='extraction class-{cls}'>"
@@ -370,16 +394,21 @@ class LangExtractService:
 
         # 標記原文中的提取項目
         highlighted_text = original_text
-        for ext in sorted(extractions, key=lambda x: len(x.get("text", "")), reverse=True):
+        for ext in sorted(
+            extractions, key=lambda x: len(x.get("text", "")), reverse=True
+        ):
             text = ext.get("text", "")
             if text and text in highlighted_text:
-                highlighted_text = highlighted_text.replace(text, f"<mark>{text}</mark>", 1)
+                highlighted_text = highlighted_text.replace(
+                    text, f"<mark>{text}</mark>", 1
+                )
 
         html_parts.extend(
             [
                 "</div>",
                 "<div class='panel'><h2>📄 原文標記</h2>",
-                f"<div class='source'>{highlighted_text[:3000]}{'...' if len(highlighted_text) > 3000 else ''}</div>",
+                f"<div class='source'>{highlighted_text[:3000]}"
+                f"{'...' if len(highlighted_text) > 3000 else ''}</div>",
                 "</div></div>",
                 "</body></html>",
             ]

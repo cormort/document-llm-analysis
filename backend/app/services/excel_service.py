@@ -12,10 +12,11 @@ import numpy as np
 import openpyxl
 import pandas as pd
 import structlog
-from app.services.llm_service import llm_service
 
 # Import backend services/utils
 from openpyxl.utils import range_boundaries
+
+from app.services.llm_service import llm_service
 
 logger = structlog.get_logger()
 
@@ -381,16 +382,13 @@ class ExcelAIAnalyzer:
         grid = ExcelUtils.get_sheet_data_with_merged_cells(file_path, sheet_name)
         preview_md = self.grid_to_markdown(grid, max_rows=50)
 
-        # Call LLM Service (Async)
-        # Note: In Backend LLM, ai_detect_table_range method doesn't exist explicitly in my Step 720 rewrite?
-        # I missed adding `ai_detect_table_range` and other specific AI tools to backend LLM Service!
-        # I MUST ADD THEM.
-        # But for now I'm writing Excel Service.
-        # I'll Assume LLM Service has `_call_provider` and I can reimplement prompts here or use `llm.ai_detect_table_range` if I add it.
-        # Given LLM Service is "Thin" in backend, maybe Excel Service should hold the prompt?
-        # Yes, `ExcelAIAnalyzer` holds the logic.
+        # Prompts live here (ExcelAIAnalyzer); LLM Service only provides _call_provider.
 
-        system_prompt = '你是 Excel 結構分析專家。請輸出 JSON：{"header_row":..., "data_start":..., "data_end":..., "key_column":..., "value_columns":[...]}'
+        system_prompt = (
+            "你是 Excel 結構分析專家。請輸出 JSON："
+            '{"header_row":..., "data_start":..., "data_end":..., '
+            '"key_column":..., "value_columns":[...]}'
+        )
         user_prompt = f"分析表格預覽：\n{preview_md}\n輸出 JSON。"
 
         result = await self.llm._call_provider(
@@ -430,7 +428,10 @@ class ExcelAIAnalyzer:
             if len(r) > name_col_idx
         ][:20]
 
-        system_prompt = '你是財務專家。識別小計/總計關鍵字。回傳 JSON: {"trigger_keywords": [...], "exclude_keywords": [...]}'
+        system_prompt = (
+            "你是財務專家。識別小計/總計關鍵字。"
+            '回傳 JSON: {"trigger_keywords": [...], "exclude_keywords": [...]}'
+        )
         user_prompt = f"intent: {intent}\nheaders: {headers}\nitems: {item_names}"
 
         result = await self.llm._call_provider(
@@ -452,7 +453,10 @@ class ExcelAIAnalyzer:
         model_name="qwen",
         local_url="http://localhost:1234/v1",
     ):
-        system_prompt = '你是財務公式專家。回傳 JSON: {"inputs": [0,1], "target": 2, "signs": {"0":1}, "description": "..."}'
+        system_prompt = (
+            "你是財務公式專家。回傳 JSON: "
+            '{"inputs": [0,1], "target": 2, "signs": {"0":1}, "description": "..."}'
+        )
         user_prompt = f"Headers: {headers}\nSample: {sample_values}"
         result = await self.llm._call_provider(
             provider, model_name, local_url, None, system_prompt, user_prompt
@@ -506,7 +510,8 @@ class ExcelAIAnalyzer:
             return "No errors."
 
         system_prompt = "你是財務審計師。診斷錯誤。"
-        user_prompt = f"Errors: {json.dumps(errors[:20], ensure_ascii=False)}\nContext: {table_context}"
+        errors_json = json.dumps(errors[:20], ensure_ascii=False)
+        user_prompt = f"Errors: {errors_json}\nContext: {table_context}"
         return await self.llm._call_provider(
             provider, model_name, local_url, None, system_prompt, user_prompt
         )

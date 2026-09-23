@@ -1,7 +1,6 @@
 """LLM API endpoints with SSE streaming support."""
 
 import asyncio
-import io
 import logging
 from collections.abc import AsyncGenerator
 from typing import Annotated

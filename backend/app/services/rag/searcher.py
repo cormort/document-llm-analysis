@@ -95,7 +95,9 @@ class RAGSearcherMixin:
             scores = await self._run_sync(
                 self.reranker.predict, pairs, show_progress_bar=False
             )
-            ranked = sorted(zip(all_results, scores), key=lambda x: x[1], reverse=True)
+            ranked = sorted(
+                zip(all_results, scores, strict=False), key=lambda x: x[1], reverse=True
+            )
 
             final_results = []
             for result, score in ranked[:n_results]:
@@ -131,7 +133,9 @@ class RAGSearcherMixin:
                 self.reranker.predict, pairs, show_progress_bar=False
             )
             ranked = sorted(
-                zip(initial_results, scores), key=lambda x: x[1], reverse=True
+                zip(initial_results, scores, strict=False),
+                key=lambda x: x[1],
+                reverse=True,
             )
             final_results = []
             for result, score in ranked[:n_results]:
@@ -202,7 +206,9 @@ class RAGSearcherMixin:
                 content_hash = hash(r["content"][:100])
                 if content_hash not in seen_content:
                     seen_content.add(content_hash)
-                    r["hybrid_score"] = (1.0 - r.get("distance", 1.0)) * weights["vector"]
+                    r["hybrid_score"] = (1.0 - r.get("distance", 1.0)) * weights[
+                        "vector"
+                    ]
                     r["match_type"] = "vector"
                     merged.append(r)
 
@@ -210,7 +216,9 @@ class RAGSearcherMixin:
                 content_hash = hash(r["content"][:100])
                 if content_hash not in seen_content:
                     seen_content.add(content_hash)
-                    r["hybrid_score"] = (1.0 - r.get("distance", 0.5)) * weights["keyword"]
+                    r["hybrid_score"] = (1.0 - r.get("distance", 0.5)) * weights[
+                        "keyword"
+                    ]
                     merged.append(r)
                 else:
                     for m in merged:
@@ -240,7 +248,7 @@ class RAGSearcherMixin:
 
 原始查詢: {query}
 
-請只輸出改寫後的查詢，每行一個，不要加編號或解釋。"""
+請只輸出改寫後的查詢，每行一個，不要加編號或解釋。"""  # noqa: E501
 
             routing = config if config else llm_service.get_routing_config("fast")
             result = await llm_service.generate_text(
@@ -403,7 +411,9 @@ class RAGSearcherMixin:
             stats["search_method"] = "hybrid"
             for q in queries:
                 all_results.extend(
-                    await self.hybrid_search(q, collection_name, n_results=n_results * 2)
+                    await self.hybrid_search(
+                        q, collection_name, n_results=n_results * 2
+                    )
                 )
         else:
             for q in queries:
@@ -428,7 +438,9 @@ class RAGSearcherMixin:
                     self.reranker.predict, pairs, show_progress_bar=False
                 )
                 ranked = sorted(
-                    zip(unique_results[:30], scores), key=lambda x: x[1], reverse=True
+                    zip(unique_results[:30], scores, strict=False),
+                    key=lambda x: x[1],
+                    reverse=True,
                 )
                 unique_results = []
                 for result, score in ranked:

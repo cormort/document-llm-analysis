@@ -1,5 +1,5 @@
-from typing import Annotated, List, Optional
 from langchain_core.tools import tool
+
 from app.services.rag_service import RAGService
 
 # Singleton instance - in a real app this might be dependency injected
@@ -8,7 +8,7 @@ rag_service = RAGService()
 @tool
 async def retrieve_documents(
     query: str,
-    collection_names: Optional[List[str]] = None,
+    collection_names: list[str] | None = None,
     n_results: int = 5
 ) -> str:
     """
@@ -23,13 +23,17 @@ async def retrieve_documents(
     try:
         # Initialize if not already
         rag_service._lazy_init()
-        
-        # If collection names are provided, use search_across_collections or specific search
+
+        # Search the given collection(s) if provided
         if collection_names:
             if len(collection_names) == 1:
-                results = await rag_service.search(query, n_results=n_results, collection_name=collection_names[0])
+                results = await rag_service.search(
+                    query, n_results=n_results, collection_name=collection_names[0]
+                )
             else:
-                results = await rag_service.search_across_collections(query, collection_names, n_results=n_results)
+                results = await rag_service.search_across_collections(
+                    query, collection_names, n_results=n_results
+                )
         else:
             # Default search (search in currently active or all - simple fallback)
             results = await rag_service.search(query, n_results=n_results)
@@ -38,7 +42,7 @@ async def retrieve_documents(
             return "No relevant documents found."
             
         formatted_results = []
-        for i, res in enumerate(results, 1):
+        for res in results:
             content = res.get('content', '')
             source = res.get('metadata', {}).get('file_name', 'Unknown')
             formatted_results.append(f"[Source: {source}]\n{content}\n")

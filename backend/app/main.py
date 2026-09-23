@@ -8,9 +8,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api import (
     agent,
+    analytics,
     auth,
     batch,
     data_files,
@@ -25,10 +27,9 @@ from app.api import (
     stats,
     upload,
     users,
-    analytics,
 )
-from app.api.chroma_maintenance import router as chroma_router
 from app.api.cache_maintenance import router as cache_router
+from app.api.chroma_maintenance import router as chroma_router
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.exceptions import register_exception_handlers
@@ -48,8 +49,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-from prometheus_fastapi_instrumentator import Instrumentator
 
 register_exception_handlers(app)
 

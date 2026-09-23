@@ -10,7 +10,9 @@ class LLMConfig(BaseModel):
 
     provider: str = Field(default="ollama", description="LLM provider")
     model_name: str = Field(default="llama3.2", description="Model name")
-    local_url: str = Field(default="http://localhost:11434", description="Local LLM URL")
+    local_url: str = Field(
+        default="http://localhost:11434", description="Local LLM URL"
+    )
     api_key: str | None = Field(default=None, description="API key for cloud providers")
     context_window: int = Field(default=16384, description="Context window size")
 
@@ -21,7 +23,9 @@ class AnalyzeRequest(BaseModel):
     content: str = Field(..., description="Text content to analyze")
     instruction: str = Field(..., description="Analysis instruction")
     config: LLMConfig = Field(default_factory=LLMConfig)
-    financial_skepticism: bool = Field(default=False, description="Enable financial audit mode")
+    financial_skepticism: bool = Field(
+        default=False, description="Enable financial audit mode"
+    )
 
 
 class AnalyzeFileRequest(BaseModel):
@@ -30,13 +34,17 @@ class AnalyzeFileRequest(BaseModel):
     file_path: str = Field(..., description="Path to file")
     instruction: str = Field(..., description="Analysis instruction")
     config: LLMConfig = Field(default_factory=LLMConfig)
-    financial_skepticism: bool = Field(default=False, description="Enable financial audit mode")
+    financial_skepticism: bool = Field(
+        default=False, description="Enable financial audit mode"
+    )
 
 
 class ChatMessage(BaseModel):
     """Chat message."""
 
-    role: Literal["user", "assistant", "system"] = Field(..., description="Message role")
+    role: Literal["user", "assistant", "system"] = Field(
+        ..., description="Message role"
+    )
     content: str = Field(..., description="Message content")
 
 
@@ -51,7 +59,9 @@ class TokenEstimationRequest(BaseModel):
     """Request for token estimation before analysis."""
 
     file_path: str | None = Field(default=None, description="Path to file to analyze")
-    text_content: str | None = Field(default=None, description="Text content to analyze")
+    text_content: str | None = Field(
+        default=None, description="Text content to analyze"
+    )
     instruction: str = Field(default="", description="User instruction")
     config: LLMConfig = Field(default_factory=LLMConfig)
     financial_skepticism: bool = Field(

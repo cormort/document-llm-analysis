@@ -272,7 +272,11 @@ class RAGIndexerMixin:
                     all_docs = col.get(include=["documents", "metadatas"])
                     if not all_docs or not all_docs["documents"]:
                         results.append(
-                            {"collection": col_name, "status": "skipped", "reason": "empty"}
+                            {
+                                "collection": col_name,
+                                "status": "skipped",
+                                "reason": "empty",
+                            }
                         )
                         continue
 
@@ -371,7 +375,7 @@ class RAGIndexerMixin:
 {content_sample}
 
 請以 JSON 格式輸出:
-{{"summary": "...", "keywords": ["關鍵詞1", "關鍵詞2", ...]}}"""
+{{"summary": "...", "keywords": ["關鍵詞1", "關鍵詞2", ...]}}"""  # noqa: E501
 
             result = await llm_service.generate_text(summary_prompt)
 

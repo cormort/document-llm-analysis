@@ -2,10 +2,11 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.user import User
 
 
 class AnalyticsEvent(Base):
@@ -35,5 +36,3 @@ class AnalyticsEvent(Base):
     def __repr__(self) -> str:
         return f"<AnalyticsEvent {self.event_type}:{self.event_name}>"
 
-
-from app.models.user import User  # noqa: F401

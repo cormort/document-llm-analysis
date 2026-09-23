@@ -7,14 +7,19 @@ import structlog
 logger = structlog.get_logger()
 
 # Define data directory for backend
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+DATA_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
+)
+
 
 class DocumentMetadataService:
     """Manage custom document metadata (display name, description, tags)"""
 
     def __init__(self, persist_path: str = None):
         """Initialize metadata service"""
-        self.persist_path = persist_path or os.path.join(DATA_DIR, "document_metadata.json")
+        self.persist_path = persist_path or os.path.join(
+            DATA_DIR, "document_metadata.json"
+        )
         self._metadata: dict[str, dict] = {}
         self._load()
 
@@ -79,7 +84,9 @@ class DocumentMetadataService:
             self._save()
             return True
         except Exception as e:
-            logger.error("Failed to update metadata", collection=collection_name, error=str(e))
+            logger.error(
+                "Failed to update metadata", collection=collection_name, error=str(e)
+            )
             return False
 
     def delete_metadata(self, collection_name: str) -> bool:

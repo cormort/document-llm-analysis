@@ -16,10 +16,10 @@ try:
 except ImportError:
     torch = None
 
+from sentence_transformers import CrossEncoder, SentenceTransformer
+
 from app.services.context_compressor import ContextCompressor
 from app.services.semantic_chunker import SemanticChunker
-from sentence_transformers import CrossEncoder, SentenceTransformer
-from app.core.metrics import CHROMADB_QUERY_LATENCY_SECONDS
 
 logger = structlog.get_logger()
 

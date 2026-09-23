@@ -5,14 +5,15 @@ MCP Tools API - 暴露 MCP Server 工具給前端使用。
 """
 
 import os
-from typing import Any
+from typing import Annotated, Any
 
 import structlog
+from fastapi import APIRouter, File, UploadFile
+from pydantic import BaseModel, Field
+
 from app.services.mcp_client_manager import (
     init_mcp_manager,
 )
-from fastapi import APIRouter, File, UploadFile
-from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/mcp", tags=["MCP Tools"])
@@ -173,7 +174,9 @@ async def call_mcp_tool(request: MCPToolCallRequest) -> MCPToolCallResponse:
 
 
 @router.post("/convert-to-markdown", response_model=ConvertToMarkdownResponse)
-async def convert_to_markdown(request: ConvertToMarkdownRequest) -> ConvertToMarkdownResponse:
+async def convert_to_markdown(
+    request: ConvertToMarkdownRequest,
+) -> ConvertToMarkdownResponse:
     """
     使用 markitdown-mcp 將檔案轉換為 Markdown
 
@@ -204,7 +207,7 @@ async def convert_to_markdown(request: ConvertToMarkdownRequest) -> ConvertToMar
 
 @router.post("/convert-to-markdown/upload", response_model=ConvertToMarkdownResponse)
 async def convert_uploaded_file_to_markdown(
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
 ) -> ConvertToMarkdownResponse:
     """
     上傳檔案並轉換為 Markdown
@@ -246,7 +249,9 @@ async def convert_uploaded_file_to_markdown(
             )
 
     except Exception as e:
-        logger.error("Convert uploaded file failed", filename=file.filename, error=str(e))
+        logger.error(
+            "Convert uploaded file failed", filename=file.filename, error=str(e)
+        )
         return ConvertToMarkdownResponse(success=False, error=str(e))
 
 

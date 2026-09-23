@@ -2,9 +2,10 @@ import json
 import os
 
 import structlog
-from app.utils.excel_processor import smart_read_excel
 from docx import Document
 from pypdf import PdfReader
+
+from app.utils.excel_processor import smart_read_excel
 
 logger = structlog.get_logger()
 
@@ -85,7 +86,7 @@ class DocumentExtractionService:
                     # 取得表格邊界框
                     table_bboxes = [t.bbox for t in page.find_tables()]
 
-                    def not_within_any_table(obj):
+                    def not_within_any_table(obj, table_bboxes=table_bboxes):
                         """Check if object is outside all table bounding boxes."""
                         for bbox in table_bboxes:
                             if (
@@ -154,7 +155,10 @@ class DocumentExtractionService:
         if start_page > end_page:
             start_page = end_page
 
-        text = f"=== PDF Page Range: {start_page} to {end_page} (Total: {total_pages}) ===\n"
+        text = (
+            f"=== PDF Page Range: {start_page} to {end_page} "
+            f"(Total: {total_pages}) ===\n"
+        )
 
         for i in range(start_page - 1, end_page):
             text += f"\n[Page {i + 1}]\n" + reader.pages[i].extract_text() + "\n"

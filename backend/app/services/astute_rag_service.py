@@ -9,10 +9,11 @@ and Knowledge Conflicts for Large Language Models" (Wang et al.)
 """
 
 import json
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import structlog
+
 from app.services.knowledge_consolidator import (
     KnowledgeConsolidator,
     knowledge_consolidator,
@@ -27,7 +28,7 @@ from app.services.reliability_scorer import (
 logger = structlog.get_logger()
 
 
-class QueryDecision(str, Enum):
+class QueryDecision(StrEnum):
     """Decision on how to handle a query."""
 
     INTERNAL_SUFFICIENT = "internal_sufficient"  # LLM knowledge is enough
@@ -131,14 +132,18 @@ class AstuteRAGService:
             result = result.strip()
             if result.startswith("```"):
                 lines = result.split("\n")
-                result = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                result = "\n".join(
+                    lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+                )
 
             parsed = json.loads(result)
 
             # Determine if retrieval is needed
             confidence = float(parsed.get("confidence", 0.5))
             knowledge_gaps = parsed.get("knowledge_gaps", [])
-            needs_retrieval = confidence < self.internal_threshold or len(knowledge_gaps) > 0
+            needs_retrieval = (
+                confidence < self.internal_threshold or len(knowledge_gaps) > 0
+            )
 
             return {
                 "internal_answer": parsed.get("internal_answer", ""),
@@ -307,7 +312,9 @@ class AstuteRAGService:
             reliability_dist = consolidated.get("reliability_distribution", {})
             high_count = reliability_dist.get("high", 0)
             total = consolidated.get("total_facts", 1)
-            confidence = min((high_count / max(total, 1)) * 1.2, 1.0)  # Boost for high reliability
+            confidence = min(
+                (high_count / max(total, 1)) * 1.2, 1.0
+            )  # Boost for high reliability
 
             # Adjust confidence based on conflicts
             if conflicts:

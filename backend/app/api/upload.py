@@ -8,9 +8,10 @@ import logging
 import os
 from pathlib import Path
 
-from app.core.exceptions import FileValidationError
 from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel
+
+from app.core.exceptions import FileValidationError
 
 logger = logging.getLogger(__name__)
 

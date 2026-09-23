@@ -7,12 +7,15 @@ from typing import Any
 
 import requests
 import structlog
+
 from app.services.llm_service import llm_service
 
 logger = structlog.get_logger()
 
 # Define data directory for backend
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+DATA_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
+)
 CACHE_DIR = os.path.join(DATA_DIR, "web_cache")
 SNAPSHOT_DIR = os.path.join(DATA_DIR, "web_snapshots")
 
@@ -59,9 +62,12 @@ class SearXNGService:
         return 50
 
     def _get_credibility_label(self, score: int) -> str:
-        if score >= 90: return "🟢"
-        elif score >= 70: return "🟡"
-        else: return "🔴"
+        if score >= 90:
+            return "🟢"
+        elif score >= 70:
+            return "🟡"
+        else:
+            return "🔴"
 
     def search(
         self,
@@ -72,7 +78,11 @@ class SearXNGService:
     ) -> dict[str, Any]:
         """Execute web search"""
         if not self.is_available():
-            return {"success": False, "results": [], "error": "SearXNG Service unavailable"}
+            return {
+                "success": False,
+                "results": [],
+                "error": "SearXNG Service unavailable",
+            }
 
         try:
             params = {
@@ -81,7 +91,9 @@ class SearXNGService:
                 "categories": categories,
                 "language": language,
             }
-            response = requests.get(f"{self.base_url}/search", params=params, timeout=15)
+            response = requests.get(
+                f"{self.base_url}/search", params=params, timeout=15
+            )
 
             if response.status_code == 200:
                 data = response.json()
@@ -90,14 +102,24 @@ class SearXNGService:
                     result_item = {
                         "title": r.get("title", ""),
                         "url": r.get("url", ""),
-                        "content": r.get("content", "")[:300] if r.get("content") else "",
-                        "publish_date": r.get("publishedDate") # Try to get if available
+                        "content": r.get("content", "")[:300]
+                        if r.get("content")
+                        else "",
+                        "publish_date": r.get(
+                            "publishedDate"
+                        ),  # Try to get if available
                     }
-                    result_item["credibility_score"] = self.score_credibility(result_item["url"])
+                    result_item["credibility_score"] = self.score_credibility(
+                        result_item["url"]
+                    )
                     results.append(result_item)
                 return {"success": True, "results": results, "error": None}
             else:
-                return {"success": False, "results": [], "error": f"HTTP {response.status_code}"}
+                return {
+                    "success": False,
+                    "results": [],
+                    "error": f"HTTP {response.status_code}",
+                }
         except Exception as e:
             logger.error("Search failed", error=str(e))
             return {"success": False, "results": [], "error": str(e)}
@@ -106,7 +128,9 @@ class SearXNGService:
         self, query: str, categories: str = "general", max_results: int = 5
     ) -> dict[str, Any]:
         """Search with file-based cache"""
-        cache_key = hashlib.md5(f"{query}:{categories}:{max_results}".encode()).hexdigest()
+        cache_key = hashlib.md5(
+            f"{query}:{categories}:{max_results}".encode()
+        ).hexdigest()
         cache_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
 
         if os.path.exists(cache_file):
@@ -114,7 +138,9 @@ class SearXNGService:
                 with open(cache_file, encoding="utf-8") as f:
                     cached = json.load(f)
                     cached_time = datetime.fromisoformat(cached["cached_at"])
-                    if datetime.now() - cached_time < timedelta(seconds=self._cache_ttl):
+                    if datetime.now() - cached_time < timedelta(
+                        seconds=self._cache_ttl
+                    ):
                         cached["from_cache"] = True
                         return cached
             except Exception:
@@ -229,14 +255,18 @@ class SearXNGService:
 
     async def summarize_results(self, results: list[dict]) -> str:
         """Summarize results using LLM (Async)"""
-        if not results: return "No results to summarize."
+        if not results:
+            return "No results to summarize."
         
         contents = "\n---\n".join([
             f"Source {i+1}: {r.get('title', '')}\n{r.get('content', '')}"
             for i, r in enumerate(results[:5])
         ])
-        
-        prompt = f"Please summarize the following search results into a concise structured summary:\n\n{contents}"
+
+        prompt = (
+            "Please summarize the following search results into a concise "
+            f"structured summary:\n\n{contents}"
+        )
         return await llm_service.generate_text(prompt)
 
     async def enhanced_search_for_context(
@@ -262,7 +292,7 @@ class SearXNGService:
         from_cache = False
         
         # 2. Search
-        # Note: We run search synchronously in threads or directly, but wrapped in async function
+        # Note: search runs synchronously, wrapped in this async function.
         # For simplicity, we just call the sync methods here.
         
         for q in queries[:3]:
@@ -273,7 +303,8 @@ class SearXNGService:
                     sources_searched.extend(result.get("sources_searched", []))
             elif use_cache:
                 result = self.search_with_cache(q)
-                if result.get("from_cache"): from_cache = True
+                if result.get("from_cache"):
+                    from_cache = True
                 if result['success']:
                     all_results.extend(result["results"])
             else:

@@ -1,10 +1,13 @@
 import re
 
-
 # XML-style thought tags used by various LLMs (Gemma, DeepSeek, QwQ, etc.)
 _THOUGHT_TAGS = ["think", "thought", "thinking", "reasoning", "internal", "scratchpad"]
 _THOUGHT_TAG_PATTERN = re.compile(
-    r"<(?:" + "|".join(_THOUGHT_TAGS) + r")[\s\S]*?</(?:" + "|".join(_THOUGHT_TAGS) + r")>",
+    r"<(?:"
+    + "|".join(_THOUGHT_TAGS)
+    + r")[\s\S]*?</(?:"
+    + "|".join(_THOUGHT_TAGS)
+    + r")>",
     re.IGNORECASE,
 )
 

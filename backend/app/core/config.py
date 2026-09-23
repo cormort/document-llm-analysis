@@ -7,6 +7,7 @@
 import os
 import secrets
 from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -62,6 +63,7 @@ class Settings(BaseSettings):
                     "JWT_SECRET_KEY not set. Using random key. "
                     "Set JWT_SECRET_KEY environment variable for production.",
                     UserWarning,
+                    stacklevel=2,
                 )
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
