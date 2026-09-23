@@ -278,7 +278,9 @@ def suggest_test(groups: list[pd.Series]) -> dict[str, Any]:
 
     return results
 
-def run_pca(df: pd.DataFrame, features: list[str], n_components: int = 2) -> dict[str, Any]:
+def run_pca(
+    df: pd.DataFrame, features: list[str], n_components: int = 2
+) -> dict[str, Any]:
     """Execute Principal Component Analysis (PCA)."""
     data = df[features].dropna()
     
@@ -313,7 +315,9 @@ def run_pca(df: pd.DataFrame, features: list[str], n_components: int = 2) -> dic
         "features_used": features
     }
 
-def run_kmeans(df: pd.DataFrame, features: list[str], n_clusters: int = 3) -> dict[str, Any]:
+def run_kmeans(
+    df: pd.DataFrame, features: list[str], n_clusters: int = 3
+) -> dict[str, Any]:
     """Execute K-Means Clustering."""
     data = df[features].dropna()
     
@@ -334,7 +338,9 @@ def run_kmeans(df: pd.DataFrame, features: list[str], n_clusters: int = 3) -> di
         cluster_data = data_with_labels[data_with_labels["Cluster"] == c]
         if len(cluster_data) > 0:
             center_dict = cluster_data[features].mean().to_dict()
-            cluster_centers[f"Cluster {c}"] = {k: float(v) for k, v in center_dict.items()}
+            cluster_centers[f"Cluster {c}"] = {
+                k: float(v) for k, v in center_dict.items()
+            }
         else:
             cluster_centers[f"Cluster {c}"] = {f: 0.0 for f in features}
             
@@ -363,7 +369,9 @@ def run_kmeans(df: pd.DataFrame, features: list[str], n_clusters: int = 3) -> di
     }
 
 
-def apply_filters(df: pd.DataFrame, filters: list[dict]) -> tuple[pd.DataFrame, list[str]]:
+def apply_filters(
+    df: pd.DataFrame, filters: list[dict]
+) -> tuple[pd.DataFrame, list[str]]:
     """
     Apply multiple column filters to a DataFrame.
 
@@ -382,7 +390,8 @@ def apply_filters(df: pd.DataFrame, filters: list[dict]) -> tuple[pd.DataFrame, 
         vals = f.get("values", [])
         if col and vals and col in result.columns:
             result = result[result[col].isin(vals)]
-            applied.append(f"{col}: {', '.join(map(str, vals[:3]))}{'...' if len(vals) > 3 else ''}")
+            more = "..." if len(vals) > 3 else ""
+            applied.append(f"{col}: {', '.join(map(str, vals[:3]))}{more}")
 
     return result, applied
 
@@ -463,18 +472,20 @@ def run_linear_regression(
     if len(data) < len(features) + 2:
         return {"error": "Insufficient data for regression"}
 
-    X = data[features]
+    x = data[features]
     y = data[target]
 
     model = LinearRegression()
-    model.fit(X, y)
+    model.fit(x, y)
 
-    r_squared = model.score(X, y)
+    r_squared = model.score(x, y)
 
-    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_)}
+    coefficients = {
+        feat: float(coef) for feat, coef in zip(features, model.coef_, strict=True)
+    }
     coefficients["intercept"] = float(model.intercept_)
 
-    y_pred = model.predict(X)
+    y_pred = model.predict(x)
     residuals = y - y_pred
     rmse = float(np.sqrt(np.mean(residuals ** 2)))
     mae = float(np.mean(np.abs(residuals)))
@@ -525,15 +536,17 @@ def run_logistic_regression(
     if len(set(y)) != 2:
         return {"error": "Target must be binary (2 classes)"}
 
-    X = data[features]
+    x = data[features]
 
     model = LogisticRegression(max_iter=1000, random_state=42)
-    model.fit(X, y)
+    model.fit(x, y)
 
-    y_pred = model.predict(X)
+    y_pred = model.predict(x)
     accuracy = float(np.mean(y_pred == y))
 
-    coefficients = {feat: float(coef) for feat, coef in zip(features, model.coef_[0])}
+    coefficients = {
+        feat: float(coef) for feat, coef in zip(features, model.coef_[0], strict=True)
+    }
     coefficients["intercept"] = float(model.intercept_[0])
 
     return {
@@ -591,7 +604,11 @@ def run_prophet_forecast(
     forecast = model.predict(future)
 
     historical = prophet_df[["ds", "y"]].to_dict(orient="records")
-    predictions = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(periods).to_dict(orient="records")
+    predictions = (
+        forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+        .tail(periods)
+        .to_dict(orient="records")
+    )
 
     return {
         "success": True,
@@ -604,7 +621,10 @@ def run_prophet_forecast(
 
 
 def run_batch_report(
-    df: pd.DataFrame, slice_column: str, analysis_types: list[str], filters: list[dict] = None
+    df: pd.DataFrame,
+    slice_column: str,
+    analysis_types: list[str],
+    filters: list[dict] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Generate batch reports for each group in a slice column.
