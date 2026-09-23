@@ -1,32 +1,39 @@
 import asyncio
-import sys
 import os
+import sys
 
 # Add parent dir to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
 
 from app.services.llm.stream_filter import StreamFilter
 
-async def mock_stream():
-    chunks = [
+
+async def run(chunks: list[str]) -> str:
+    async def stream():
+        for c in chunks:
+            yield c
+
+    return "".join([c async for c in StreamFilter().filter_stream(stream())])
+
+
+def test_filter():
+    out = asyncio.run(run([
         "Task: Summarize the press release.\n",
         "Chunk 1: Data about statistics.\n",
-        "Constraint 1: Be objective.\n",
-        "\n",
+        "<think>hidden</think>",
         "### 社會保障摘要\n",
         "這份報告指出了...",
-        "更多內容。"
-    ]
-    for c in chunks:
-        yield c
-        await asyncio.sleep(0.01)
+        "更多內容。",
+    ]))
+    assert out == "### 社會保障摘要\n這份報告指出了...更多內容。", out
 
-async def test_filter():
-    sf = StreamFilter()
-    print("--- Starting Filter Test ---")
-    async for filtered_chunk in sf.filter_stream(mock_stream()):
-        print(f"[{filtered_chunk}]", end="", flush=True)
-    print("\n--- End of Test ---")
+    # A chunk that starts mid-line must not be mistaken for a thinking prefix.
+    assert asyncio.run(run(["Tomorrow ", "I will go."])) == "Tomorrow I will go."
+
+    # A trailing partial "<" is flushed at end of stream.
+    assert asyncio.run(run(["a ", "<"])) == "a <"
+
 
 if __name__ == "__main__":
-    asyncio.run(test_filter())
+    test_filter()
+    print("ok")

@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator
 
 import google.generativeai as genai
+import httpx
 import requests
 import structlog
 from app.core.metrics import LLM_TOKEN_USAGE_TOTAL
@@ -409,15 +410,22 @@ class LLMProviders:
     ) -> AsyncGenerator[str, None]:
         """Streaming implementation for OpenAI-compatible providers."""
         normalized_provider = provider.strip().lower()
-        base_url = (local_url or "").rstrip("/")
+        if provider == "OpenAI":
+            base_url = "https://api.openai.com/v1"
+        else:
+            base_url = (local_url or "").rstrip("/")
         endpoint = f"{base_url}/chat/completions"
 
         headers = {"Content-Type": "application/json"}
-        effective_key = api_key_input
-        if normalized_provider == "omlx":
+        # Only OpenAI and omlx get a key; api_key_input may be the server's
+        # Google key, which must not be sent to an arbitrary local_url.
+        effective_key = None
+        if provider == "OpenAI":
+            effective_key = api_key_input
+        elif normalized_provider == "omlx":
             from app.core.config import settings as cfg
             effective_key = cfg.OMLX_API_KEY or api_key_input or None
-        
+
         if effective_key:
             headers["Authorization"] = f"Bearer {effective_key}"
 
@@ -432,22 +440,14 @@ class LLMProviders:
         }
 
         try:
-            # We use a non-blocking way to call requests.post with stream=True
-            # For brevity, using run_sync to wrap the generator source
-            response = await self.run_sync(
-                requests.post,
-                endpoint,
-                headers=headers,
-                json=payload,
-                stream=True,
-                timeout=kwargs.get("timeout", 900)
-            )
-            response.raise_for_status()
-
-            for line in response.iter_lines():
-                if line:
-                    line_str = line.decode("utf-8")
-                    if line_str.startswith("data: "):
+            async with httpx.AsyncClient(timeout=kwargs.get("timeout", 900)) as client:
+                async with client.stream(
+                    "POST", endpoint, headers=headers, json=payload
+                ) as response:
+                    response.raise_for_status()
+                    async for line_str in response.aiter_lines():
+                        if not line_str.startswith("data: "):
+                            continue
                         data_str = line_str[6:].strip()
                         if data_str == "[DONE]":
                             break

@@ -43,6 +43,8 @@ class StreamFilter:
         self.buffer = ""
         self.in_thought_block = False
         self.current_tag = None
+        # Whether the next yielded text begins a new line (chunks split mid-line).
+        self.at_line_start = True
 
     def _find_thought_tag_open(self, text: str) -> tuple[int, str] | None:
         for tag in self.THOUGHT_TAGS:
@@ -82,13 +84,15 @@ class StreamFilter:
         """Filter out lines that start with thinking prefixes."""
         lines = text.split("\n")
         filtered_lines = []
-        for line in lines:
+        for i, line in enumerate(lines):
             stripped = line.strip()
-            is_prefix = any(
+            # The first piece continues the previous chunk's line unless that ended with \n.
+            is_prefix = (i > 0 or self.at_line_start) and any(
                 re.match(p, stripped, re.IGNORECASE) for p in self.THINKING_PREFIXES
             )
             if not is_prefix:
                 filtered_lines.append(line)
+        self.at_line_start = text.endswith("\n")
         return "\n".join(filtered_lines)
 
     async def filter_stream(
@@ -149,3 +153,8 @@ class StreamFilter:
             if self.buffer.strip() and not self._find_potential_tag_open(self.buffer):
                 yield self._filter_prefixes(self.buffer)
                 self.buffer = ""
+
+        # Flush whatever was held back (e.g. a trailing "<" that never became a tag).
+        if not self.in_thought_block and self.buffer:
+            yield self._filter_prefixes(self.buffer)
+            self.buffer = ""
